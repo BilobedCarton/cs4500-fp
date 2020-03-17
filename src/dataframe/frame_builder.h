@@ -5,6 +5,7 @@
 #include <stdio.h>
 
 #include "dataframe.h"
+#include "utils/helper.h"
 
 static const int READ_ROW_SUCCESS = 1;
 static const int READ_ROW_EOF_FAIL = -1;
@@ -105,6 +106,132 @@ public:
 		return df;
 	}
 };
+
+class SOR_FrameBuilder : public FrameBuilder {
+public:
+	SOR_FrameBuilder(char* path, Schema& s) : FrameBuilder(path, s) { }
+	SOR_FrameBuilder(const char* path, Schema& s) : FrameBuilder(path, s) { }
+
+	~SOR_FrameBuilder() { }
+
+	String* clean_string(String* field) {
+		char* cleaned = new char[field->size() + 1];
+		cleaned[field->size()] = '\0';
+		size_t idx = 0;
+
+		for (int i = 0; i < field->size(); ++i)
+		{
+			if(field->at(i) == ' ') { continue; } // space spadding
+			if(field->at(i) == '\"' && idx != 0) { break; } // found end quote. Chop off remaining input.
+			if(field->at(i) == '\"') { continue; } // found first quote
+			cleaned[idx++] = field->at(i);
+		}
+		cleaned[idx] = '\0';
+		delete(field);
+		return new String(cleaned);
+	}
+
+	String* clean_int(String* field) {
+		char* cleaned = new char[field->size() + 1];
+		cleaned[field->size()] = '\0';
+		size_t idx = 0;
+
+		for (int i = 0; i < field->size(); ++i)
+		{
+			if(field->at(i) == ' ' && idx != 0) break;
+			if(field->at(i) == ' ') { continue; } // space spadding
+			cleaned[idx++] = field->at(i);
+		}
+		cleaned[idx] = '\0';
+		delete(field);
+		if(strcmp(to_str<int>(atoi(cleaned)), cleaned) != 0) return new String("0");
+		return new String(cleaned);
+	}
+
+	String* clean_float(String* field) {
+		char* cleaned = new char[field->size() + 1];
+		cleaned[field->size()] = '\0';
+		size_t idx = 0;
+
+		for (int i = 0; i < field->size(); ++i)
+		{
+			if(field->at(i) == ' ' && idx != 0) break;
+			if(field->at(i) == ' ') { continue; } // space spadding
+			cleaned[idx++] = field->at(i);
+		}
+		cleaned[idx] = '\0';
+		delete(field);
+		if(strcmp(to_str<float>(atoi(cleaned)), cleaned) != 0) return new String("0");
+		return new String(cleaned);
+	}
+
+	String* clean_boolean(String* field) {
+		char* cleaned = new char[field->size() + 1];
+		cleaned[field->size()] = '\0';
+		size_t idx = 0;
+
+		for (int i = 0; i < field->size(); ++i)
+		{
+			if(field->at(i) == ' ' && idx != 0) break;
+			if(field->at(i) == ' ') { continue; } // space spadding
+			cleaned[idx++] = field->at(i);
+		}
+		cleaned[idx] = '\0';
+		delete(field);
+		if(strcmp(to_str<bool>(atoi(cleaned)), cleaned) != 0) return new String("0");
+		return new String(cleaned);
+	}
+
+	String* clean_field(String* field, char type) {
+		switch(type) {
+			case 'S':
+				return clean_string(field);
+			case 'I':
+				return clean_int(field);
+			case 'F':
+				return clean_float(field);
+			case 'B':
+				return clean_boolean(field);
+			default:
+				return nullptr;
+		}
+	}
+
+	int read_field(Row& r, int col) {
+		int inQuotes = 0; // 0 - no quote found, 1 - first quote found, 2 - second quote found
+		// read to next '<'
+		char c = fgetc(_f);
+		while(c != '<') {
+			if(c == EOF || c == '\n') return col;
+			c = fgetc(_f);
+		}
+
+		// next char is first char of field
+		c = fgetc(_f);
+		StrBuff field;
+		while(c != '>' || inQuotes == 1) {
+			if(c == EOF || c == '\n') return col;
+			if(c == '\"') { inQuotes++; }
+			field.addc(c);
+			c = fgetc(_f);
+		}
+
+		add_field_to_row(clean_field(field.get(), r.col_type(col)), r, col)
+		return ++col;
+	}
+
+	int read_row() {
+		char c = fgetc(_f);
+		if(c == EOF) return READ_ROW_EOF_FAIL; // fail (found end of file)
+
+		Row* r = new Row(_df->get_schema());
+		int col = 0;
+		while(col != read_field(*r, col)) {}
+		_df->add_row(*r);
+		delete(r);
+		return READ_ROW_SUCCESS;
+	}
+}
 
 /**
  * @brief      Builder to create frame objects from a csv file step by step.
