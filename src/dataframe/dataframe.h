@@ -4,10 +4,10 @@
 #include <stdarg.h>
 
 #include "arraywrapper.h"
-#include "helper.h"
-#include "array.h"
-#include "string.h"
-#include "thread.h"
+#include "utils/helper.h"
+#include "utils/array.h"
+#include "utils/string.h"
+#include "utils/thread.h"
 
 /*************************************************************************
  * Schema::

@@ -14,10 +14,10 @@
 #include <errno.h>
 
 #include "network.h"
-#include "array.h"
-#include "object.h"
+#include "utils/array.h"
+#include "utils/object.h"
 #include "message.h"
-#include "thread.h"
+#include "utils/thread.h"
 
 static const int ACTIVE_PORT = 8080;
 static const char* HOST_SERVER = "127.0.0.1";

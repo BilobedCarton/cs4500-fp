@@ -4,10 +4,11 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
-#include "helper.h"
+
+#include "utils/helper.h"
 #include "field.h"
-#include "object.h"
-#include "string.h"
+#include "utils/object.h"
+#include "utils/string.h"
 #include "sorfile.h"
 
 

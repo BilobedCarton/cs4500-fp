@@ -15,10 +15,10 @@
 #include <errno.h>
 
 #include "network.h"
-#include "array.h"
-#include "object.h"
+#include "utils/array.h"
+#include "utils/object.h"
 #include "message.h"
-#include "thread.h"
+#include "utils/thread.h"
 
 static const size_t MSG_BUFFER_SIZE = 1024; // currently we only handle 1024 character messages
 

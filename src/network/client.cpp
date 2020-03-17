@@ -3,7 +3,7 @@
 #include <iostream>
 
 #include "network.h"
-#include "thread.h"
+#include "utils/thread.h"
 
 /**
  * @brief      This class describes a client listener to receive messages.

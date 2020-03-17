@@ -6,8 +6,8 @@
 #include <string.h>
 #include <stddef.h>
 
-#include "object.h"
-#include "string.h"
+#include "utils/object.h"
+#include "utils/string.h"
 
 
 /**

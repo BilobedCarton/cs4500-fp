@@ -1,7 +1,7 @@
 //lang::CwC
 
 #include "network.h"
-#include "thread.h"
+#include "utils/thread.h"
 
 class ServerRegisterListener : public Thread {
 public:

@@ -5,8 +5,8 @@
 #include <iostream>
 #include <string>
 
-#include "object.h"
-#include "list.h"
+#include "utils/object.h"
+#include "utils/list.h"
 
 void print(char c) {
 	std::cout << c;

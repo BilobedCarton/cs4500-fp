@@ -6,8 +6,8 @@
 #include <assert.h>
 #include <string.h>
 
-#include "object.h"
-#include "string.h"
+#include "utils/object.h"
+#include "utils/string.h"
 
 // Static values to specify the type of field this is.
 static const size_t INT_TYPE = 0;

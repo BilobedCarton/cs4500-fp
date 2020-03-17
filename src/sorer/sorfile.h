@@ -3,9 +3,9 @@
 #pragma once
 
 #include "field.h"
-#include "object.h"
-#include "string.h"
-#include "helper.h"
+#include "utils/object.h"
+#include "utils/string.h"
+#include "utils/helper.h"
 
 /**
  * @brief      This class describes a SoR file.

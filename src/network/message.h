@@ -5,9 +5,9 @@
 #include <netinet/in.h>
 #include <string.h>
 
-#include "object.h"
-#include "string.h"
-#include "serial.h"
+#include "utils/object.h"
+#include "utils/string.h"
+#include "utils/serial.h"
 
 enum class MsgKind { Ack = 0, Nack, Put, Reply, Get, WaitAndGet, Status, Kill, Register, Directory, Disconnect };
 

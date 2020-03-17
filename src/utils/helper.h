@@ -63,24 +63,8 @@ class Sys {
   void t_true(bool p) { if (!p) myfail(); }
   void t_false(bool p) { if (p) myfail(); }
 
-  // conversion of numerical types to char* arrays
-  char* size_t_to_str(size_t d) {
-    std::string str = std::to_string(d);
+  template <class T>
+  char* to_str(T v) {
+    std::string str = std::to_string(v);
     return strdup(str.c_str());
   }
-
-  char* double_to_str(double d) {
-    std::string str = std::to_string(d);
-    return strdup(str.c_str());
-  }
-
-  char* short_to_str(short s) {
-    std::string str = std::to_string(s);
-    return strdup(str.c_str());
-  }
-
-  char* long_to_str(long l) {
-    std::string str = std::to_string(l);
-    return strdup(str.c_str());
-  }
-};
