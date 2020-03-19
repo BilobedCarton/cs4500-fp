@@ -3,9 +3,9 @@
 #include <assert.h>
 #include <stdlib.h>
 
-#include "utils/object.h"
-#include "utils/array.h"
-#include "utils/string.h"
+#include "../utils/object.h"
+#include "../utils/array.h"
+#include "../utils/string.h"
 
 const size_t CHILD_SIZE = 128;
 

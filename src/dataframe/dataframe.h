@@ -4,10 +4,10 @@
 #include <stdarg.h>
 
 #include "arraywrapper.h"
-#include "utils/helper.h"
-#include "utils/array.h"
-#include "utils/string.h"
-#include "utils/thread.h"
+#include "../utils/helper.h"
+#include "../utils/array.h"
+#include "../utils/string.h"
+#include "../utils/thread.h"
 
 /*************************************************************************
  * Schema::
@@ -461,6 +461,14 @@ class Row : public Object {
     }
   }
 
+  ~Row() {
+    for (int i = 0; i < _cols->count(); ++i)
+    {
+      delete(_cols->get(i));
+    }
+    delete(_cols);
+  }
+
   Column* get_column_obj(size_t idx) {
     return dynamic_cast<Column *>(_cols->get(idx));
   }
@@ -620,6 +628,10 @@ class DataFrame : public Object {
   }
 
   ~DataFrame() {
+    for (int i = 0; i < ncols(); ++i)
+    {
+      delete(_cols->get(i));
+    }
     delete(_schema);
     delete(_cols);
   }
@@ -760,31 +772,30 @@ class DataFrame : public Object {
  
   /** Print the dataframe in SoR format to standard output. */
   void print() {
-    Sys s;
     for (int row = 0; row < nrows(); ++row)
     {
       for (int col = 0; col < ncols(); ++col)
       {
-        s.p('<');
+        p('<');
         switch(_schema->col_type(col)) {
           case 'I':
-            s.p(get_int(col, row));
+            p(get_int(col, row));
             break;
           case 'F':
-            s.p(get_float(col, row));
+            p(get_float(col, row));
             break;
           case 'B':
-            s.p(get_bool(col, row));
+            p(get_bool(col, row));
             break;
           case 'S':
-            s.p(get_string(col, row)->c_str());
+            p(get_string(col, row)->c_str());
             break;
           default:
             break;
         }
-        s.p("> ");
+        p("> ");
       }
-      s.p('\n');
+      p('\n');
     }
   }
 

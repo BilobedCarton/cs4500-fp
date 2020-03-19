@@ -62,9 +62,10 @@ class Sys {
   void OK(const char* m) { pln(m); }
   void t_true(bool p) { if (!p) myfail(); }
   void t_false(bool p) { if (p) myfail(); }
+};
 
-  template <class T>
-  char* to_str(T v) {
-    std::string str = std::to_string(v);
-    return strdup(str.c_str());
-  }
+template<typename T> static char* to_str(T v) {
+  std::string str = std::to_string(v);
+  const char* c_str = str.c_str();
+  return strdup(c_str);
+}

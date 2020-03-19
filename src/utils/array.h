@@ -14,31 +14,31 @@
 
 // Resizeable array with amortized appending to end of list and constant 
 // time retrieval
-class Array : public SerializableObject {
+class Array : public Object {
 public:
     size_t size_;
     size_t capacity_;
-    SerializableObject** list_;
+    Object** list_;
 
     // Empty constructor
     Array() {
         size_ = 0;
         capacity_ = 4;
-        list_ = new SerializableObject*[capacity_];
+        list_ = new Object*[capacity_];
     }
 
     // capacity given constructor
     Array(size_t capacity) {
         size_ = 0;
         capacity_ = capacity;
-        list_ = new SerializableObject*[capacity_];
+        list_ = new Object*[capacity_];
     }
 
     // Deep copy of other array
     Array(const Array* arr) {
         size_ = arr->size_;
         capacity_ = arr->capacity_;
-        list_ = new SerializableObject*[capacity_];
+        list_ = new Object*[capacity_];
         for (int i = 0; i < size_; ++i)
         {
             list_[i] = arr->list_[i] == nullptr ? nullptr : arr->list_[i]->clone();
@@ -86,16 +86,16 @@ public:
     }
 
     // Return the object at the index or null
-    SerializableObject* get(size_t idx) {
+    Object* get(size_t idx) {
         if(idx >= size_) return NULL;
         return list_[idx];
     }
 
     // Append the object to the end of this and return this
-    Array* append(SerializableObject* obj) {
+    Array* append(Object* obj) {
         if(size_ == capacity_) {
             capacity_ *= 2;
-            SerializableObject** new_list = new SerializableObject*[capacity_];
+            Object** new_list = new Object*[capacity_];
             for (int i = 0; i < size_; ++i)
             {
                 new_list[i] = list_[i];
@@ -108,7 +108,7 @@ public:
     }
 
     // Return index of object in this or -1 if the object is not contained
-    int index(SerializableObject* obj)  {
+    int index(Object* obj)  {
         for (int i = 0; i < size_; ++i)
         {   
             if(list_[i] != nullptr) {
@@ -119,7 +119,7 @@ public:
     }
 
     // Returns true if this contains object else false
-    bool contains(SerializableObject* obj) {
+    bool contains(Object* obj) {
         return index(obj) != -1;
     }
 
@@ -133,7 +133,7 @@ public:
     }
 
     // Insert a copy of the object at the index if index from [0, this->count()] and return this
-    Array* insert(size_t idx, SerializableObject* obj) {
+    Array* insert(size_t idx, Object* obj) {
         if(idx > size_) return this;
         append(obj);
         for (int i = size_ - 1; i > idx; --i)
@@ -145,19 +145,19 @@ public:
         return this;
     }
 
-    Array* set(size_t idx, SerializableObject* obj) {
+    Array* set(size_t idx, Object* obj) {
         if(idx >= size_) return this;
         list_[idx] = obj;
         return this;
     }
 
     // Return and remove object at the index or return null
-    SerializableObject* pop(size_t idx) {
+    Object* pop(size_t idx) {
         if(idx >= size_) return NULL;
-        SerializableObject* obj = list_[idx];
+        Object* obj = list_[idx];
         for (int i = idx; i < size_ - 1; ++i)
         {
-            SerializableObject* temp = list_[i];
+            Object* temp = list_[i];
             list_[i] = list_[i + 1];
             list_[i + 1] = temp;
         }
@@ -168,7 +168,7 @@ public:
 
     // Removes first occurance of object from this if this contains it and
     // return this
-    Array* remove(SerializableObject* obj) {
+    Array* remove(Object* obj) {
         int idx = index(obj);
         if(idx == -1) return this;
         delete(pop(idx));
@@ -177,7 +177,7 @@ public:
 
     // Inplace reverse of this and return this
     Array* reverse() {
-        SerializableObject** new_list = new SerializableObject*[capacity_];
+        Object** new_list = new Object*[capacity_];
         for (int i = 0; i < size_; ++i)
         {
             new_list[size_ - i - 1] = list_[i];
@@ -195,34 +195,11 @@ public:
         }
         delete[](list_);
         size_ = 0;
-        list_ = new SerializableObject*[capacity_];
-    }
-
-    virtual char* serialize() {
-        StrBuff buf;
-        buf.c("AR|");
-        buf.c(size_t_to_str(size_));
-        buf.addc('|');
-
-        for (int i = 0; i < size_; ++i)
-        {
-            buf.c(vals_[i]->serialize());
-            buf.addc('|');
-        }
-
-        String* str = buf.get();
-        char* serialized = new char[str->size_];
-        strncpy(serialized, str->c_str(), str->size_);
-        delete(str);
-        return serialized;
-    }
-
-    static Array* deserialize(char* serialized) {
-
+        list_ = new Object*[capacity_];
     }
 };
 
-class StringArray : public Array {
+class StringArray : public Array, public SerializableObject {
 public:
     StringArray() : Array() {}
 
@@ -237,11 +214,22 @@ public:
     }
 
     char* serialize() {
-        char* str = Array::serialize();
-        // change tag
-        str[0] = 'S';
-        str[1] = 'A';
-        return str;
+        StrBuff buf;
+        buf.c("SA|");
+        buf.c(to_str<size_t>(size_));
+        buf.addc('|');
+
+        for (int i = 0; i < size_; ++i)
+        {
+            buf.c(list_[i]->c_str());
+            buf.addc('|'); // delimiter for contained strings
+        }
+
+        String* str = buf.get();
+        char* serialized = new char[str->size_];
+        strncpy(serialized, str->c_str(), str->size_);
+        delete(str);
+        return serialized;
     }
 
     static StringArray* deserialize(char* serialized) {
@@ -271,7 +259,7 @@ class DoubleArray : public SerializableObject {
 public:
     size_t capacity_;
     size_t size_;
-    double* vals_;
+    double* list_;
 
     // Empty constructor
     DoubleArray() {
@@ -295,7 +283,7 @@ public:
     DoubleArray(size_t capacity) {
         size_ = 0;
         capacity_ = capacity;
-        list_ = new int[capacity_];
+        list_ = new double[capacity_];
     }
 
     // Clear contents of this before this is freed
@@ -438,7 +426,7 @@ public:
 
         for (int i = 0; i < size_; ++i)
         {
-            buf.c(to_str<double>(vals_[i]));
+            buf.c(to_str<double>(list_[i]));
             buf.addc('|'); // delimiter for contained doubles
         }
 
@@ -658,7 +646,7 @@ class IntArray : public Object {
 
         for (int i = 0; i < size_; ++i)
         {
-            buf.c(to_str<int>(vals_[i]));
+            buf.c(to_str<int>(list_[i]));
             buf.addc('|'); // delimiter for contained doubles
         }
 
@@ -880,7 +868,7 @@ class FloatArray : public Object {
 
         for (int i = 0; i < size_; ++i)
         {
-            buf.c(to_str<float>(vals_[i]));
+            buf.c(to_str<float>(list_[i]));
             buf.addc('|'); // delimiter for contained doubles
         }
 
@@ -1102,7 +1090,7 @@ class BoolArray : public Object {
 
         for (int i = 0; i < size_; ++i)
         {
-            buf.c(to_str<size_t>(vals_[i]));
+            buf.c(to_str<size_t>(list_[i]));
             buf.addc('|'); // delimiter for contained doubles
         }
 

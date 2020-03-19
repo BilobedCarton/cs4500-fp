@@ -97,6 +97,9 @@ public:
         val_ = new char[capacity_ = 10];
         size_ = 0;
     }
+    ~StrBuff() {
+        if(val_ != nullptr) delete[](val_);
+    }
     void grow_by_(size_t step) {
         if (step + size_ < capacity_) return;
         capacity_ *= 2;
