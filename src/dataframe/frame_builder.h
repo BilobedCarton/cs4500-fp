@@ -26,22 +26,35 @@ public:
 
 	char classify_field(String* field) {
 		if(field->size() == 0) return 'M'; // missing
+		char* field_arr;
+		
+		if(field->c_str()[0] == '+') {
+			field_arr = strdup(&(field->c_str()[1]));
+		} else {
+			field_arr = strdup(field->c_str());
+		}
 
-		char* validity_check = to_str<float>((float)atof(field->c_str()));
-		if(strcmp(validity_check, field->c_str()) == 0) {
+		char* validity_check = to_str<float>((float)atof(field_arr));
+		if(strcmp(validity_check, field_arr) == 0) {
 			delete[](validity_check);
+			delete[](field_arr);
+
 			return 'F'; // float parsing was valid
 		}
 
 		delete[](validity_check);
-		validity_check = to_str<int>(atoi(field->c_str()));
-		if(strcmp(validity_check, field->c_str()) == 0) { // int parsing was valid
+		validity_check = to_str<int>(atoi(field_arr));
+		if(strcmp(validity_check, field_arr) == 0) { // int parsing was valid
 			delete[](validity_check);
+			delete[](field_arr);
+
 			// could be int or bool
 			int val = atoi(field->c_str());
 			if(val == 0 || val == 1) return 'B';
 			return 'I';
 		}
+
+		delete[](field_arr);
 		delete[](validity_check);
 
 		// otherwise it's a string.
@@ -162,10 +175,12 @@ public:
 	void add_field_to_row(String* s, Row& r, size_t idx) {
 		switch(r.col_type(idx)) {
 			case 'I':
-				r.set(idx, atoi(s->c_str()));
+				if(s->at(0) == '+') r.set(idx, atoi(&(s->c_str()[1])));
+				else r.set(idx, atoi(s->c_str()));
 				return;
 			case 'F':
-				r.set(idx, (float)atof(s->c_str()));
+				if(s->at(0) == '+') r.set(idx, (float)atoi(&(s->c_str()[1])));
+				else r.set(idx, (float)atoi(s->c_str()));
 				return;
 			case 'B':
 				if(strcmp(s->c_str(), "1") == 0) r.set(idx, true);
@@ -256,6 +271,7 @@ public:
 		for (int i = 0; i < field->size(); ++i)
 		{
 			if(field->at(i) == ' ' && idx != 0) break;
+			if(field->at(i) == '+' && idx == 0 && (type == 'I' || type == 'F')) { continue; }
 			if(field->at(i) == ' ') { continue; } // space spadding
 			cleaned[idx++] = field->at(i);
 		}
