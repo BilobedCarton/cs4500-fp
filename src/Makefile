@@ -10,5 +10,8 @@ test:
 main:
 	g++ -o main -g -Wall -std=c++11 ./main.cpp
 
+valgrind:
+	valgrind --leak-check=yes --track-origins=yes ./main.cpp
+
 clean:
 	-rm -r main *.dSYM
