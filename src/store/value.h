@@ -27,16 +27,16 @@ public:
      * 
      * @param so the serializable object stored in this value
      */
-    Value(SerializableObject so) {
-        serialized_ = so.serialize();
+    Value(SerializableObject* so) {
+        serialized_ = so->serialize();
     }
 
     /**
      * @brief Destroy the Value object
      * Checks if serialized exists because child classes may have deleted it (caching)
      */
-    ~Value() {
-        if(serialized != nullptr) delete[](serialized_);
+    virtual ~Value() {
+        if(serialized_ != nullptr) delete[](serialized_);
     }
 
     /**
@@ -126,11 +126,11 @@ public:
      * @param pos - the position in the file of the stored value
      * @param so - the serializable object represented by this value
      */
-    CachableValue(char* file, size_t pos, SerializableObject so) : CachableValue(file, pos, sizeof(so.serialize())) {
+    CachableValue(char* file, size_t pos, SerializableObject* so) : CachableValue(file, pos, sizeof(so->serialize())) {
         FILE* f = fopen(file_, "r+");
         assert(f != nullptr);
         assert(fseek(f, position_, SEEK_SET) == 0);
-        assert(fwrite(so.serialize(), sizeof(char), size_ / sizeof(char), f) == size_ / sizeof(char));
+        assert(fwrite(so->serialize(), sizeof(char), size_ / sizeof(char), f) == size_ / sizeof(char));
         fclose(f);
     }
 
@@ -140,12 +140,18 @@ public:
      * @param file - the file the value is stored in
      * @param so - the serializable object represented by this value
      */
-    CachableValue(char* file, SerializableObject so) : CachableValue(file, 0, sizeof(so.serialize())) {
+    CachableValue(char* file, SerializableObject* so) {
+        file_ = new char[strlen(file) + 1];
+        strcpy(file_, file);
+        file_[strlen(file)] = '\0';
+        char* serialized = so->serialize();
+        size_ = strlen(serialized);
+
         FILE* f = fopen(file_, "r+");
         assert(f != nullptr);
         assert(fseek(f, 0L, SEEK_END) == 0);
         position_ = ftell(f);
-        assert(fwrite(so.serialize(), sizeof(char), size_ / sizeof(char), f) == size_ / sizeof(char));
+        assert(fwrite(serialized, sizeof(char), size_ / sizeof(char), f) == size_ / sizeof(char));
         fclose(f);
     }
 
@@ -162,6 +168,9 @@ public:
      * 
      */
     void cache() {
+        serialized_ = new char[size_ / sizeof(char) + 1];
+        serialized_[size_ / sizeof(char)] = '\0';
+
         FILE* f = fopen(file_, "r");
         assert(f != nullptr);
         assert(fseek(f, position_, SEEK_SET) == 0);
@@ -175,6 +184,7 @@ public:
      */
     void uncache() {
         delete[](serialized_);
+        serialized_ = nullptr;
         last_access_ = 0;
     }
 

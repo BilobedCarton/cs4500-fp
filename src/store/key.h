@@ -13,7 +13,17 @@ class Key : public Object {
     char* name_; // owned
     size_t idx_; // the index of the node hosting the Dataframe linked to this key
 
-    //Key() {}
+    /**
+     * @brief Construct a new Key object
+     * 
+     * @param name - the key string used as a key
+     * @param idx - the index of the node linked to this key
+     */
+    Key(const char* name, size_t idx) {
+        assert(strlen(name) > 0);
+        name_ = duplicate(name);
+        idx_ = idx;
+    }
 
     /**
      * @brief Construct a new Key object
@@ -45,7 +55,7 @@ class Key : public Object {
     // inherited from object
     size_t hash_me() {
         size_t h = 0;
-        for (size_t i = 0; i < sizeof(name_); ++i) {
+        for (size_t i = 0; i < strlen(name_); ++i) {
             h += 31 * name_[i]; // use a prime larger than 26
         }
         return h;
