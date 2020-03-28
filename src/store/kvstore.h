@@ -10,6 +10,8 @@
 #define GROWTH_FACTOR 4
 #define GROWTH_THRESHOLD 0.5
 
+static size_t ID_COUNTER = 0; // used for giving new KVStores a unique id
+
 /**
  * @brief A node stored in the KVStore that allows for collision handling
  * 
@@ -152,6 +154,7 @@ public:
  */
 class KVStore : public Object {
 public:
+    size_t id_;
     KVStore_Node** nodes_; // owned, elements owned
     size_t capacity_; 
 
@@ -161,6 +164,7 @@ public:
      * @param capacity - the starting capacity of this store
      */
     KVStore(size_t capacity) {
+        id_ = ID_COUNTER++;
         capacity_ = capacity;
         nodes_ = new KVStore_Node*[capacity_];
     }
