@@ -2,6 +2,19 @@
     "files.associations": {
         "list": "cpp",
         "xhash": "cpp",
-        "typeinfo": "cpp"
+        "typeinfo": "cpp",
+        "__hash_table": "cpp",
+        "functional": "cpp",
+        "iterator": "cpp",
+        "string": "cpp",
+        "unordered_map": "cpp",
+        "vector": "cpp",
+        "*.tcc": "cpp",
+        "ostream": "cpp",
+        "hashtable": "cpp",
+        "iomanip": "cpp",
+        "locale": "cpp",
+        "streambuf": "cpp",
+        "bitset": "cpp"
     }
 }

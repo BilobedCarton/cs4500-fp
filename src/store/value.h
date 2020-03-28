@@ -20,7 +20,9 @@ public:
      * @brief Construct a new Value object
      * Default constructor for use by child classes
      */
-    Value() {}
+    Value() {
+        serialized_ = nullptr;
+    }
 
     /**
      * @brief Construct a new Value object
@@ -102,7 +104,7 @@ public:
     char* file_; // owned
     size_t position_;
     size_t size_;
-    time_t last_access_;
+    time_t last_access_ = 0;
 
     /**
      * @brief Construct a new Cachable Value object

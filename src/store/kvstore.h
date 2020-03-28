@@ -85,37 +85,13 @@ public:
     KVStore_Node* pop() {
         if(next_ != nullptr) {
             if(next_->next_ == nullptr) {
-                KVStore_Node* node = next_->next_;
+                KVStore_Node* node = next_;
                 next_ = nullptr;
                 return node;
             }
             return next_->pop();
         }
         return nullptr;
-
-    }
-
-    /**
-     * @brief insert the given node at the given index
-     * 
-     * @param idx - the index in the list 
-     * @param n - the node to be inserted
-     */
-    void insert(size_t idx, KVStore_Node* n) {
-        if(idx == 0) {
-            KVStore_Node holder(n->k_, n->v_);
-            n->k_ = k_;
-            n->v_ = v_;
-            n->next_ = next_;
-            k_ = holder.k_;
-            v_ = holder.v_;
-            next_ = n;
-        }
-        else if(next_ == nullptr) {
-            p("Reached end of KVStore node grouping with ").p(idx).pln(" indices to go.");
-            // do we want to fail outright?
-        }
-        else next_->insert(idx - 1, n);
     }
 
     /**
@@ -125,10 +101,9 @@ public:
      * @param k - the key of the node to find
      * @return KVStore_Node* - the node
      */
-    KVStore_Node* find(Key k) {
-        if(k.equals(this)) return this;
+    KVStore_Node* find(Key* k) {
+        if(k->equals(k_)) return this;
         else if(next_ == nullptr) {
-            //p("Failed to find key: ").pln(k._name);
             return nullptr;
         }
         return next_->find(k);
@@ -141,10 +116,25 @@ public:
      * @param k - the key mapped to the value
      * @return Value* - the value mapped to the key
      */
-    Value* getValue(Key k) {
+    Value* getValue(Key* k) {
         KVStore_Node* node = find(k);
         if(node == nullptr) return nullptr;
         return node->v_;
+    }
+
+    /**
+     * @brief links the given key to the given value in this node set, updating a node if the key already exists
+     * 
+     * @param k - the key
+     * @param v - the new value
+     */
+    void set(Key* k, Value* v) {
+        KVStore_Node* node = find(k);
+        if(node == nullptr) pushBack(new KVStore_Node(k, v));
+        else { 
+            delete(node->v_);
+            node->v_ = v->clone();
+        }
     }
 };
 
@@ -167,6 +157,11 @@ public:
         id_ = ID_COUNTER++;
         capacity_ = capacity;
         nodes_ = new KVStore_Node*[capacity_];
+        for (size_t i = 0; i < capacity_; i++)
+        {
+            nodes_[i] = nullptr;
+        }
+        
     }
 
     /**
@@ -206,8 +201,8 @@ public:
      * @param k - the key
      * @return size_t - the index
      */
-    size_t get_position(Key k) {
-        return k.hash() % capacity_;
+    size_t get_position(Key* k) {
+        return k->hash() % capacity_;
     }
 
     /**
@@ -215,11 +210,11 @@ public:
      * 
      * @param node - the node to be inserted
      */
-    void put(KVStore_Node* node) {
-        if(nodes_[get_position(*node->k_)] == nullptr) {
-            nodes_[get_position(*node->k_)] = node;
+    void put_node(KVStore_Node* node) {
+        if(nodes_[get_position(node->k_)] == nullptr) {
+            nodes_[get_position(node->k_)] = node;
         } else {
-            nodes_[get_position(*node->k_)]->pushBack(node);
+            nodes_[get_position(node->k_)]->pushBack(node);
         }
     }
 
@@ -241,10 +236,10 @@ public:
             if(old[i] != nullptr) {
                 KVStore_Node* node = old[i]->pop();
                 while(node != nullptr) {
-                    put(node);
+                    put_node(node);
                     node = old[i]->pop();
                 }
-                put(old[i]);
+                put_node(old[i]);
             }
         }
         delete[](old);
@@ -256,7 +251,8 @@ public:
      * @param k - the key
      * @return Value* - the linked value
      */
-    Value* get(Key k) {
+    Value* get(Key* k) {
+        if(nodes_[get_position(k)] == nullptr) return nullptr;
         return nodes_[get_position(k)]->getValue(k);
     }
 
@@ -266,7 +262,7 @@ public:
      * @param k - the key
      * @return Value* - the linked value
      */
-    Value* waitAndGet(Key k) {
+    Value* waitAndGet(Key* k) {
         while(get(k) == nullptr) { sleep(1); } // TODO: pick actual sleeping time
         return get(k);
     }
@@ -278,9 +274,11 @@ public:
      * @param v - the value
      * @return KVStore* - this
      */
-    KVStore* put(Key k, Value v) {
-        put(new KVStore_Node(&k, &v));
+    KVStore* put(Key* k, Value* v) {
         grow();
+        size_t pos = get_position(k);
+        if(nodes_[pos] == nullptr) nodes_[pos] = new KVStore_Node(k, v);
+        else nodes_[pos]->set(k, v);
         return this;
     }
 };

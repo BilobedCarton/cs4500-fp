@@ -79,7 +79,7 @@ public:
         assert(strcmp(v_reg->serialized(), so1->serialize()) == 0);
         OK("Value::Value(so) -- passed.");
 
-        //assert(v_cache->serialized_ == nullptr);
+        assert(v_cache->serialized_ == nullptr);
         assert(strcmp(v_cache->file_, file_) == 0);
         assert(v_cache->position_ == 20);
         assert(v_cache->size_ == strlen(so2->serialize()));
