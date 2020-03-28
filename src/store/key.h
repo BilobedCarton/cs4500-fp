@@ -10,38 +10,49 @@
  **/
 class Key : public Object {
     public:
-    char* _name; // owned
-    size_t _idx; // the index of the node hosting the Dataframe linked to this key
+    char* name_; // owned
+    size_t idx_; // the index of the node hosting the Dataframe linked to this key
 
-    Key() {}
+    //Key() {}
 
+    /**
+     * @brief Construct a new Key object
+     * 
+     * @param name - the key string used as a key
+     * @param idx - the index of the node linked to this key
+     */
     Key(char* name, size_t idx) {
         assert(strlen(name) > 0);
-        _name = new char[strlen(name) + 1];
-        strcpy(_name, name);
-        _name[strlen(name)] = '\0';
-        _idx = idx;
+        name_ = duplicate(name);
+        idx_ = idx;
     }
 
+    /**
+     * @brief Destroy the Key object
+     * 
+     */
     ~Key() {
-        delete[](name);
+        delete[](name_);
     }
-
+    
+    // inherited from object
     bool equals(Object* other) {
         Key* cast = dynamic_cast<Key *>(other);
         if(cast == nullptr) return false;
-        return strcmp(_name, cast->_name) == 0;
+        return strcmp(name_, cast->name_) == 0;
     }
 
+    // inherited from object
     size_t hash_me() {
         size_t h = 0;
-        for (size_t i = 0; i < sizeof(_name); ++i) {
-            h += 31 * _name[i]; // use a prime larger than 26
+        for (size_t i = 0; i < sizeof(name_); ++i) {
+            h += 31 * name_[i]; // use a prime larger than 26
         }
         return h;
     }
 
+    // inherited from object
     Object* clone() {
-        return new Key(name, idx);
+        return new Key(name_, idx_);
     }
 };

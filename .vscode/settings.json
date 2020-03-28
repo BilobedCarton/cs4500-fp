@@ -1,6 +1,7 @@
 {
     "files.associations": {
         "list": "cpp",
-        "xhash": "cpp"
+        "xhash": "cpp",
+        "typeinfo": "cpp"
     }
 }
