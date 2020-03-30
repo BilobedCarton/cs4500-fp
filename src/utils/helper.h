@@ -3,6 +3,7 @@
 
 #include <cstdlib>
 #include <cstring>
+#include <cmath>
 #include <iostream>
 #include <string>
 
@@ -42,6 +43,14 @@ class Sys {
     char* res = new char[strlen(s) + 1];
     strcpy(res, s);
     return res;
+  }
+
+  bool stringEqual(char* str1, char* str2) {
+      return strcmp(str1, str2) == 0;
+  }
+
+  bool doubleAlmostEqual(double d1, double d2, size_t sig_figs) {
+      return fabs(d1 - d2) < pow(10, -1 * sig_figs);
   }
 
   // Function to terminate execution with a message

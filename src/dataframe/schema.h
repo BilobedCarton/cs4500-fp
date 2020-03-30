@@ -23,8 +23,7 @@ public:
     Schema(Schema& from) {
         ncol = from.ncol;
         nrow = from.nrow;
-        Sys s;
-        col_types = s.duplicate(from.col_types);
+        col_types = duplicate(from.col_types);
         col_names = new Array(from.col_names);
         row_names = new Array(from.row_names);
     }

@@ -28,7 +28,7 @@ class Column : public Object {
     * undefined behavior. **/
   virtual void push_back(int val) { return; }
   virtual void push_back(bool val) { return; }
-  virtual void push_back(float val) { return; }
+  virtual void push_back(double val) { return; }
   virtual void push_back(String* val) { return; }
  
  /** Returns the number of elements in the column. */
