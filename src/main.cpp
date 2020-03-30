@@ -64,7 +64,7 @@ void executeOperation(DataFrame& df, OperationType ot, size_t col, size_t row) {
 					df.pln(df.get_int(col, row));
 					return;
 				case 'F':
-					df.pln(df.get_float(col, row));
+					df.pln(df.get_double(col, row));
 					return;
 				case 'B':
 					df.pln(df.get_bool(col, row));

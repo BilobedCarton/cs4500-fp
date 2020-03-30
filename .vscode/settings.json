@@ -15,6 +15,7 @@
         "iomanip": "cpp",
         "locale": "cpp",
         "streambuf": "cpp",
-        "bitset": "cpp"
+        "bitset": "cpp",
+        "new": "cpp"
     }
 }

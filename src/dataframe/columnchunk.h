@@ -5,19 +5,20 @@
 #include "../utils/array.h"
 #include "../utils/string.h"
 
+static size_t ID_COUNTER = 0;
 
 /*
  * A ColumnChunk holds a portion of data belonging to a larger singular Column entity.
  * Chunk data is stored serialized for easy shipping around the cluster, only being deserialized for resassembly by another entity.
  */
 class ColumnChunk : public Object {
-    public: 
+public: 
     size_t _id; // identifier for this chunk
     char* _data; // serialized version of this chunk's data
     ColumnChunk* _next; // some sort of reference to the next piece of data (null if final chunk?)
 
-    ColumnChunk(size_t id, char* data) {
-        _id = id;
+    ColumnChunk() {
+        _id = ID_COUNTER++;
         _data = data;
     }
 
