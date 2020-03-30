@@ -25,13 +25,13 @@ build-tests:
 	cd ./tests; g++ -o testDataframe -Wall -std=c++17 ./dataframe/testDataframe.cpp
 
 run-tests:
-	-./tests/testKey
-	-./tests/testKVStore
-	-./tests/testValue
-	-./tests/testSchema
-	-./tests/testRow
-	-./tests/testColumn
-	-./tests/testDataframe
+	-./tests/testKey; echo
+	-./tests/testKVStore; echo
+	-./tests/testValue; echo
+	-./tests/testSchema; echo
+	-./tests/testRow; echo
+	-./tests/testColumn; echo
+	-./tests/testDataframe; echo
 
 clean-tests:
 	-cd ./tests; rm testKey testKVStore testValue testSchema testRow testColumn testDataframe

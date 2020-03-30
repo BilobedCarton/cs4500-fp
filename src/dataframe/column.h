@@ -2,7 +2,13 @@
 
 #include "../utils/object.h"
 #include "../utils/string.h"
-#include "arraywrapper.h"
+#include "../utils/primitivearray.h"
+
+// page size divided by type size
+#define INT_CHUNK_SIZE 4096 / sizeof(int) 
+#define BOOL_CHUNK_SIZE 4096 / sizeof(bool) 
+#define DOUBLE_CHUNK_SIZE 4096 / sizeof(double) 
+#define STRING_CHUNK_SIZE 4096 / sizeof(String *) 
 
 class IntColumn;
 class StringColumn;
@@ -53,17 +59,16 @@ class Column : public Object {
  */
 class IntColumn : public Column {
  public:
-  IntArrayWrapper* _data;
+  PrimitiveArray<int>* _data;
 
-  IntColumn() { _data = new IntArrayWrapper(); }
+  IntColumn() { _data = new PrimitiveArray<int>(INT_CHUNK_SIZE); }
 
-  IntColumn(int n, ...) {
-    _data = new IntArrayWrapper();
+  IntColumn(int n, ...) : IntColumn() {
     va_list args;
     va_start(args, n);
     for (int i = 0; i < n; ++i)
     {
-      _data->append(va_arg(args, int));
+      _data->push_back(va_arg(args, int));
     }
     va_end(args);
   }
@@ -72,12 +77,12 @@ class IntColumn : public Column {
     delete(_data);
   }
 
-  void push_back(int val) { this->as_int()->_data->append(val); }
+  void push_back(int val) { this->as_int()->_data->push_back(val); }
 
   int get(size_t idx) { return _data->get(idx); }
   IntColumn* as_int() { return dynamic_cast<IntColumn *>(this); }
   void set(size_t idx, int val) { _data->set(idx, val); }
-  size_t size() { return _data->size(); }
+  size_t size() { return _data->count(); }
 
   bool data_equals(Object  * other) {
     IntColumn* cast = dynamic_cast<IntColumn *>(other);
@@ -89,10 +94,7 @@ class IntColumn : public Column {
   /** Return a copy of the object; nullptr is considered an error */
   Object* clone() { 
     IntColumn* clone = new IntColumn();
-    for (int i = 0; i < size(); ++i)
-    {
-      clone->push_back(get(i));
-    }
+    clone->_data = _data->clone();
     return clone;
   }
 };
@@ -105,17 +107,16 @@ class IntColumn : public Column {
  */
 class DoubleColumn : public Column {
  public:
-  FloatArrayWrapper* _data;
+  PrimitiveArray<double>* _data;
 
-  DoubleColumn() { _data = new FloatArrayWrapper(); }
+  DoubleColumn() { _data = new PrimitiveArray<double>(DOUBLE_CHUNK_SIZE); }
 
-  DoubleColumn(int n, ...) {
-    _data = new FloatArrayWrapper();
+  DoubleColumn(int n, ...) : DoubleColumn() {
     va_list args;
     va_start(args, n);
     for (int i = 0; i < n; ++i)
     {
-      _data->append(va_arg(args, double));
+      _data->push_back(va_arg(args, double));
     }
     va_end(args);
   }
@@ -124,12 +125,12 @@ class DoubleColumn : public Column {
     delete(_data);
   }
 
-  void push_back(double val) { this->as_double()->_data->append(val); }
+  void push_back(double val) { this->as_double()->_data->push_back(val); }
 
   double get(size_t idx) { return _data->get(idx); }
   DoubleColumn* as_double() { return dynamic_cast<DoubleColumn *>(this); }
   void set(size_t idx, float val) { _data->set(idx, val); }
-  size_t size() { return _data->size(); }
+  size_t size() { return _data->count(); }
 
   /** Subclasses should redefine */
   bool data_equals(Object  * other) {
@@ -142,10 +143,7 @@ class DoubleColumn : public Column {
   /** Return a copy of the object; nullptr is considered an error */
   Object* clone() { 
     DoubleColumn* clone = new DoubleColumn();
-    for (int i = 0; i < size(); ++i)
-    {
-      clone->push_back(get(i));
-    }
+    clone->_data = _data->clone();
     return clone;
   }
 };
@@ -156,20 +154,19 @@ class DoubleColumn : public Column {
  */
 class BoolColumn : public Column {
  public:
-  BoolArrayWrapper* _data;
+  PrimitiveArray<bool>* _data;
 
-  BoolColumn() { _data = new BoolArrayWrapper(); }
+  BoolColumn() { _data = new PrimitiveArray<bool>(BOOL_CHUNK_SIZE); }
 
   // taking in ints in 1s and 0s, any other number is invalid
-  BoolColumn(int n, ...) {
-    _data = new BoolArrayWrapper();
+  BoolColumn(int n, ...) : BoolColumn() {
     va_list args;
     va_start(args, n);
     for (int i = 0; i < n; ++i)
     {
       int v = va_arg(args, int);
-      if(v == 1) _data->append(true);
-      else if(v == 0) _data->append(false);
+      if(v == 1) _data->push_back(true);
+      else if(v == 0) _data->push_back(false);
       else assert(false);
     }
     va_end(args);
@@ -179,12 +176,12 @@ class BoolColumn : public Column {
     delete(_data);
   }
 
-  void push_back(bool val) { this->as_bool()->_data->append(val); }  
+  void push_back(bool val) { this->as_bool()->_data->push_back(val); }  
 
   bool get(size_t idx) { return _data->get(idx); }
   BoolColumn* as_bool() { return dynamic_cast<BoolColumn *>(this); }
   void set(size_t idx, bool val) { _data->set(idx, val); }
-  size_t size() { return _data->size(); }
+  size_t size() { return _data->count(); }
 
   bool data_equals(Object  * other) {
     BoolColumn* cast = dynamic_cast<BoolColumn *>(other);
@@ -196,10 +193,7 @@ class BoolColumn : public Column {
   /** Return a copy of the object; nullptr is considered an error */
   Object* clone() { 
     BoolColumn* clone = new BoolColumn();
-    for (int i = 0; i < size(); ++i)
-    {
-      clone->push_back(get(i));
-    }
+    clone->_data = _data->clone();
     return clone;
   }
 };
@@ -211,25 +205,23 @@ class BoolColumn : public Column {
  */
 class StringColumn : public Column {
  public:
-  StringArrayWrapper* _data;
+  StringArray* _data;
 
-  StringColumn() { _data = new StringArrayWrapper(); }
+  StringColumn() { _data = new StringArray(STRING_CHUNK_SIZE); }
 
   StringColumn(int n, ...) {
-    _data = new StringArrayWrapper();
+    _data = new StringArray(STRING_CHUNK_SIZE);
     va_list args;
     va_start(args, n);
     for (int i = 0; i < n; ++i) {
-      _data->append(new String(*va_arg(args, String *)));
+      String* s = new String(*va_arg(args, String *));
+      _data->push_back(s);
+      delete(s);
     }
     va_end(args);
   }
 
   ~StringColumn() {
-    for (int i = 0; i < _data->size(); ++i)
-    {
-      delete(_data->get(i));
-    }
     delete(_data);
   }
 
@@ -238,8 +230,8 @@ class StringColumn : public Column {
   String* get(size_t idx) { return _data->get(idx); }
   /** Acquire ownership for the string. */
   void set(size_t idx, String* val) { _data->set(idx, new String(*val)); }
-  void push_back(String* val) { _data ->append(new String(*val)); }
-  size_t size() { return _data->size(); }
+  void push_back(String* val) { _data ->push_back(val); }
+  size_t size() { return _data->count(); }
 
   bool data_equals(Object  * other) {
     StringColumn* cast = dynamic_cast<StringColumn *>(other);
@@ -251,10 +243,7 @@ class StringColumn : public Column {
   /** Return a copy of the object; nullptr is considered an error */
   Object* clone() { 
     StringColumn* clone = new StringColumn();
-    for (int i = 0; i < size(); ++i)
-    {
-      clone->push_back(get(i));
-    }
+    clone->_data = _data->clone();
     return clone;
   }
 };

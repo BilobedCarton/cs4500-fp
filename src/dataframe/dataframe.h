@@ -3,7 +3,6 @@
 #include <assert.h>
 #include <stdarg.h>
 
-#include "arraywrapper.h"
 #include "../utils/helper.h"
 #include "../utils/array.h"
 #include "../utils/string.h"
