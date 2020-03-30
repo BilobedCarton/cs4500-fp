@@ -4,10 +4,7 @@
 
 #include "object.h"
 
-class SerializableObject : public Object {
-public:
-	virtual char* serialize() { return nullptr; }
-
+class SerializableObject : public Object, public Serializable {
 	static char* get_descriptor(char* serialized) {
 		char* descriptor = new char[3];
 		descriptor[0] = serialized[0];
@@ -15,4 +12,9 @@ public:
 		descriptor[2] = '\0';
 		return descriptor;
 	}
+};
+
+class Serializable {
+public:
+	virtual char* serialize() { return nullptr; }
 };
