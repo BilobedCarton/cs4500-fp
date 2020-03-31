@@ -20,7 +20,7 @@ class DoubleColumn;
  * This abstract class defines methods overriden in subclasses. There is
  * one subclass per element type. Columns are mutable, equality is pointer
  * equality. */
-class Column : public Object {
+class Column : public SerializableObject {
  public:
  
   /** Type converters: Return same column under its actual type, or
@@ -51,6 +51,8 @@ class Column : public Object {
 
   // Checks if the stored data is the same as the given object's stored data
   virtual bool data_equals(Object * other) { return false; }
+
+  virtual SerialString* serialize() { return nullptr; }
 };
  
 /*************************************************************************
@@ -62,6 +64,13 @@ class IntColumn : public Column {
   PrimitiveArray<int>* _data;
 
   IntColumn() { _data = new PrimitiveArray<int>(INT_CHUNK_SIZE); }
+
+  IntColumn(size_t size, int* arr) : IntColumn() {
+    for (size_t i = 0; i < size; i++)
+    {
+      push_back(arr[i]);
+    }
+  }
 
   IntColumn(int n, ...) : IntColumn() {
     va_list args;
@@ -97,6 +106,28 @@ class IntColumn : public Column {
     clone->_data = _data->clone();
     return clone;
   }
+
+  SerialString* serialize() {
+    SerialString* data_serial = _data->serialize();
+    
+    size_t size = data_serial->size_ + 1;
+    char* serialStr = new char[size];
+    serialStr[0] = 'I';
+
+    memcpy(serialStr+1, data_serial->data_, data_serial->size_);
+    delete(data_serial);
+
+    SerialString* serial = new SerialString(serialStr, size);
+    delete[](serialStr);
+    return serial;
+  }
+
+  static IntColumn* deserialize(SerialString* serialized) {
+    IntColumn* col = new IntColumn();
+    delete(col->_data);
+    col->_data = PrimitiveArray<int>::deserialize(serialized);
+    return col;
+  }
 };
  
 // Other primitive column classes similar...
@@ -110,6 +141,13 @@ class DoubleColumn : public Column {
   PrimitiveArray<double>* _data;
 
   DoubleColumn() { _data = new PrimitiveArray<double>(DOUBLE_CHUNK_SIZE); }
+
+  DoubleColumn(size_t size, double* arr) : DoubleColumn() {
+    for (size_t i = 0; i < size; i++)
+    {
+      push_back(arr[i]);
+    }
+  }
 
   DoubleColumn(int n, ...) : DoubleColumn() {
     va_list args;
@@ -146,6 +184,28 @@ class DoubleColumn : public Column {
     clone->_data = _data->clone();
     return clone;
   }
+
+  SerialString* serialize() {
+    SerialString* data_serial = _data->serialize();
+    
+    size_t size = data_serial->size_ + 1;
+    char* serialStr = new char[size];
+    serialStr[0] = 'F';
+
+    memcpy(serialStr+1, data_serial->data_, data_serial->size_);
+    delete(data_serial);
+
+    SerialString* serial = new SerialString(serialStr, size);
+    delete[](serialStr);
+    return serial;
+  }
+
+  static DoubleColumn* deserialize(SerialString* serialized) {
+    DoubleColumn* col = new DoubleColumn();
+    delete(col->_data);
+    col->_data = PrimitiveArray<double>::deserialize(serialized);
+    return col;
+  }
 };
 
 /*************************************************************************
@@ -157,6 +217,13 @@ class BoolColumn : public Column {
   PrimitiveArray<bool>* _data;
 
   BoolColumn() { _data = new PrimitiveArray<bool>(BOOL_CHUNK_SIZE); }
+
+  BoolColumn(size_t size, bool* arr) : BoolColumn() {
+    for (size_t i = 0; i < size; i++)
+    {
+      push_back(arr[i]);
+    }
+  }
 
   // taking in ints in 1s and 0s, any other number is invalid
   BoolColumn(int n, ...) : BoolColumn() {
@@ -196,6 +263,28 @@ class BoolColumn : public Column {
     clone->_data = _data->clone();
     return clone;
   }
+
+  SerialString* serialize() {
+    SerialString* data_serial = _data->serialize();
+    
+    size_t size = data_serial->size_ + 1;
+    char* serialStr = new char[size];
+    serialStr[0] = 'B';
+
+    memcpy(serialStr+1, data_serial->data_, data_serial->size_);
+    delete(data_serial);
+
+    SerialString* serial = new SerialString(serialStr, size);
+    delete[](serialStr);
+    return serial;
+  }
+
+  static BoolColumn* deserialize(SerialString* serialized) {
+    BoolColumn* col = new BoolColumn();
+    delete(col->_data);
+    col->_data = PrimitiveArray<bool>::deserialize(serialized);
+    return col;
+  }
 };
  
 /*************************************************************************
@@ -208,6 +297,13 @@ class StringColumn : public Column {
   StringArray* _data;
 
   StringColumn() { _data = new StringArray(STRING_CHUNK_SIZE); }
+
+  StringColumn(size_t size, String** arr) : StringColumn() {
+    for (size_t i = 0; i < size; i++)
+    {
+      push_back(arr[i]);
+    }
+  }
 
   StringColumn(int n, ...) {
     _data = new StringArray(STRING_CHUNK_SIZE);
@@ -245,5 +341,27 @@ class StringColumn : public Column {
     StringColumn* clone = new StringColumn();
     clone->_data = _data->clone();
     return clone;
+  }
+
+  SerialString* serialize() {
+    SerialString* data_serial = _data->serialize();
+    
+    size_t size = data_serial->size_ + 1;
+    char* serialStr = new char[size];
+    serialStr[0] = 'S';
+
+    memcpy(serialStr+1, data_serial->data_, data_serial->size_);
+    delete(data_serial);
+
+    SerialString* serial = new SerialString(serialStr, size);
+    delete[](serialStr);
+    return serial;
+  }
+
+  static StringColumn* deserialize(SerialString* serialized) {
+    StringColumn* col = new StringColumn();
+    delete(col->_data);
+    col->_data = StringArray::deserialize(serialized);
+    return col;
   }
 };

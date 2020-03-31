@@ -14,10 +14,10 @@ void testDataFrame() {
 	assert(ds.nrows() == 0);
 	assert(ds.ncols() == 4);
 
-	// get name not in frame
-	String no("I'm not in the dataframe");
-	assert(ds.get_col(no) == -1);
-	assert(ds.get_row(no) == -1);
+	// // get name not in frame
+	// String no("I'm not in the dataframe");
+	// assert(ds.get_col(no) == -1);
+	// assert(ds.get_row(no) == -1);
 
 	// add_row and add_column
 	Row r(ds.get_schema());
@@ -31,10 +31,10 @@ void testDataFrame() {
 	}
 
 	IntColumn* col = new IntColumn(5, -1, -11, -21, -31, -41);
-	ds.add_column(col, name);
+	ds.add_column(col);
 	assert(!s.equals(&ds.get_schema()));
 	assert(ds.ncols() == 5);
-	assert(ds.get_col(*name) == 4);
+	// assert(ds.get_col(*name) == 4);
 
 	for (int i = 0; i < 5; ++i)
 	{
@@ -65,7 +65,7 @@ void testDataFrame() {
 	DataFrame dsClone(ds);
 	assert(dsClone.ncols() == ds.ncols());
 	assert(dsClone.nrows() != ds.nrows());
-	assert(dsClone.get_col(*name) == ds.get_col(*name));
+	// assert(dsClone.get_col(*name) == ds.get_col(*name));
 
 	// cleanup
 	delete(name);
@@ -80,28 +80,28 @@ void testSchemaFunctionality() {
 	// constructors
 	Schema def;
 	assert(def.width() == 0 && def.length() == 0);
-	def.add_column('I', nullptr);
-	def.add_column('B', nullptr);
-	def.add_column('S', nullptr);
+	def.add_column('I');
+	def.add_column('B');
+	def.add_column('S');
 	Schema s("IBS");
 	assert(def.equals(&s)); // check if we are equal to a similar schema
 	assert(def.width() == 3); // check the width
 
 	// copy and add column
 	String* colName = new String("float");
-	def.add_column('F', colName); // add a new column
+	def.add_column('F'); // add a new column
 	Schema copy(def); // copy the schema
 	assert(def.equals(&copy)); // check equality
-	assert(def.col_name(3)->equals(colName)); // check name equality
+	// assert(def.col_name(3)->equals(colName)); // check name equality
 	assert(def.width() == 4); // check width
 
 	// add row
-	def.add_row(nullptr); // alright let's add a row
+	def.add_row(); // alright let's add a row
 	assert(def.length() == 1); // check length
-	assert(def.row_name(0) == nullptr); // check row name
-	def.add_row(colName); // add a row with a name
+	// assert(def.row_name(0) == nullptr); // check row name
+	def.add_row(); // add a row with a name
 	assert(def.length() == 2); // check length
-	assert(def.row_name(1)->equals(colName)); // check row name
+	// assert(def.row_name(1)->equals(colName)); // check row name
 
 	// clean up
 	delete(colName);
@@ -259,8 +259,8 @@ void testDataframeFunctionality() {
 
 	// get name not in frame
 	String no("I'm not in the dataframe");
-	assert(ds.get_col(no) == -1); // we should fail to find no in columns
-	assert(ds.get_row(no) == -1); // same in rows
+	// assert(ds.get_col(no) == -1); // we should fail to find no in columns
+	// assert(ds.get_row(no) == -1); // same in rows
 
 	// add_row and add_column
 	// add 5 rows with dynamic(ish) data
@@ -276,10 +276,10 @@ void testDataframeFunctionality() {
 
 	// add one column
 	IntColumn* col = new IntColumn(5, -1, -11, -21, -31, -41);
-	ds.add_column(col, name);
+	ds.add_column(col);
 	assert(!s.equals(&ds.get_schema())); // make sure schema changed
 	assert(ds.ncols() == 5); // columns should have incremented
-	assert(ds.get_col(*name) == 4); // found column should be the last index (4)
+	// assert(ds.get_col(*name) == 4); // found column should be the last index (4)
 
 	// check the stored data is correct.
 	for (int i = 0; i < 5; ++i)
@@ -312,7 +312,7 @@ void testDataframeFunctionality() {
 	DataFrame dsClone(ds);
 	assert(dsClone.ncols() == ds.ncols()); // column number should be the same
 	assert(dsClone.nrows() != ds.nrows()); // rows should not
-	assert(dsClone.get_col(*name) == ds.get_col(*name)); // column names should be the same
+	// assert(dsClone.get_col(*name) == ds.get_col(*name)); // column names should be the same
 
 	// cleanup
 	delete(name);

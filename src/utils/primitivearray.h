@@ -91,50 +91,54 @@ public:
         return true;
     }
 
-    virtual char* serialize() {
-        char* serial = new char[sizeof(size_t) + sizeof(size_t) + (sizeof(T) * capacity_) + (sizeof(bool) * capacity_) + 1];
-        serial[sizeof(size_t) + sizeof(size_t) + (sizeof(T) * capacity_) + (sizeof(bool) * capacity_)] = '\0';
+    SerialString* serialize() {
+        size_t size = sizeof(size_t) + sizeof(size_t) + (sizeof(T) * capacity_) + (sizeof(bool) * capacity_);
+        char* serial = new char[size];
         size_t pos = 0;
         
         // capacity
-        memcpy(&serial[pos], &capacity_, sizeof(size_t));
+        memcpy(serial + pos, &capacity_, sizeof(capacity_));
         pos += sizeof(size_t);
 
         // size
-        memcpy(&serial[pos], &size_, sizeof(size_t));
+        memcpy(serial + pos, &size_, sizeof(size_t));
         pos += sizeof(size_t);
 
         // data
-        memcpy(&serial[pos], data_, sizeof(T) * capacity_);
+        memcpy(serial + pos, data_, sizeof(T) * capacity_);
         pos += sizeof(T) * capacity_;
 
         // missing
-        memcpy(&serial[pos], missing_, sizeof(bool) * capacity_);
+        memcpy(serial + pos, missing_, sizeof(bool) * capacity_);
+        pos += sizeof(bool) * capacity_;
 
-        return serial;
+        SerialString* s = new SerialString(serial, pos);
+        delete[](serial);
+
+        return s;
     }
 
-    static PrimitiveArrayChunk<T>* deserialize(char* serialized) {
+    static PrimitiveArrayChunk<T>* deserialize(SerialString* serialized) {
         size_t pos = 0;
 
         // capacity
         size_t cap;
-        memcpy(&cap, &serialized[pos], sizeof(size_t));
+        memcpy(&cap, &serialized->data_[pos], sizeof(size_t));
         pos += sizeof(size_t);
         assert(cap != 0);
 
         PrimitiveArrayChunk<T>* chunk = new PrimitiveArrayChunk<T>(cap);
         
         // size
-        memcpy(&chunk->size_, &serialized[pos], sizeof(size_t));
+        memcpy(&chunk->size_, &serialized->data_[pos], sizeof(size_t));
         pos += sizeof(size_t);
 
         // data
-        memcpy(&chunk->data_, &serialized[pos], sizeof(T) * chunk->capacity_);
+        memcpy(chunk->data_, &serialized->data_[pos], sizeof(T) * chunk->capacity_);
         pos += sizeof(T) * chunk->capacity_;
 
         // missing
-        memcpy(&chunk->missing_, &serialized[pos], sizeof(bool) * chunk->capacity_);
+        memcpy(chunk->missing_, &serialized->data_[pos], sizeof(bool) * chunk->capacity_);
 
         return chunk;
     }
@@ -248,8 +252,8 @@ public:
         return true;
     }
 
-    virtual char* serialize() {
-        size_t serialized_chunk_size = sizeof(size_t) + sizeof(size_t) + (sizeof(T) * capacity_) + (sizeof(bool) * capacity_);
+    virtual SerialString* serialize() {
+        size_t serialized_chunk_size = sizeof(size_t) + sizeof(size_t) + (sizeof(T) * chunk_size_) + (sizeof(bool) * chunk_size_);
         char* serial = new char[sizeof(size_t) + sizeof(size_t) + (serialized_chunk_size * chunks_) + 1];
         serial[sizeof(size_t) + sizeof(size_t) + (serialized_chunk_size * chunks_)] = '\0';
         size_t pos = 0;
@@ -264,35 +268,40 @@ public:
 
         // data
         for (size_t i = 0; i < chunks_; i++) {
-            char* serialized_chunk = data_[i]->serialize();
-            memcpy(&serial[pos], serialized_chunk, serialized_chunk_size);
-            pos+= serialized_chunk_size;
-            delete[](serialized_chunk);
+            SerialString* serialized_chunk = data_[i]->serialize();
+            memcpy(&serial[pos], serialized_chunk->data_, serialized_chunk->size_);
+            pos+= serialized_chunk->size_;
+            delete(serialized_chunk);
         }
+
+        SerialString* s = new SerialString(serial, pos);
+        delete[](serial);
         
-        return serial;
+        return s;
     }
 
-    static PrimitiveArray<T>* deserialize(char* serialized) {
+    static PrimitiveArray<T>* deserialize(SerialString* serialized) {
         size_t chunks;
         size_t chunk_size;
         size_t pos = 0;
         
         // chunks
-        memcpy(&chunks, &serialized[pos], sizeof(size_t));
+        memcpy(&chunks, &serialized->data_[pos], sizeof(size_t));
         pos += sizeof(size_t);
 
         // chunk size
-        memcpy(&chunk_size, &serialized[pos], sizeof(size_t));
+        memcpy(&chunk_size, &serialized->data_[pos], sizeof(size_t));
         pos += sizeof(size_t);
 
         PrimitiveArray<T>* arr = new PrimitiveArray<T>(chunk_size, chunks * 2);
 
         // data
-        size_t serialized_chunk_size = sizeof(size_t) + sizeof(size_t) + (sizeof(T) * arr->capacity_) + (sizeof(bool) * arr->capacity_);
+        size_t serialized_chunk_size = sizeof(size_t) + sizeof(size_t) + (sizeof(T) * arr->chunk_size_) + (sizeof(bool) * arr->chunk_size_);
         for (size_t i = 0; i < chunks; i++) {
-            arr->data_[arr->chunks_++] = PrimitiveArrayChunk<T>::deserialize(&serialized[pos]);
+            SerialString* serial = new SerialString(&serialized->data_[pos], serialized_chunk_size);
+            arr->data_[arr->chunks_++] = PrimitiveArrayChunk<T>::deserialize(serial);
             pos += serialized_chunk_size;
+            delete(serial);
         }
 
         return arr;
@@ -339,30 +348,23 @@ public:
         return true;
     }
 
-    char* serialize() {
+    SerialString* serialize() {
         // data
-        StrBuff buf;
+        SerialString** serial_data = new SerialString*[size_];
+        size_t data_size = 0;
         for (size_t i = 0; i < size_; i++)
         {
-            size_t size;
-            char* size_str = new char[sizeof(size_t)];
             if(isMissing(i)) {
-                size = 0;
-                memcpy(size_str, &size, sizeof(size_t));
-                buf.c(size_str);
+                serial_data[i] = new SerialString("0", sizeof(size_t));
+                data_size += sizeof(size_t);
             }
             else {
-                String* str = get(i);
-                size = str->size();
-                memcpy(size_str, &size, sizeof(size_t));
-                buf.c(size_str);
-                buf.c(str->c_str());
+                serial_data[i] = get(i)->serialize();
+                data_size += serial_data[i]->size_;
             }
         }
-        String* dataString = buf.get();
 
-        char* serial = new char[sizeof(size_t) + sizeof(size_t) + dataString->size() + (sizeof(bool) * capacity_) + 1];
-        serial[sizeof(size_t) + sizeof(size_t) + dataString->size() + (sizeof(bool) * capacity_)] = '\0';
+        char* serial = new char[sizeof(size_t) + sizeof(size_t) + data_size + (sizeof(bool) * capacity_)];
         size_t pos = 0;
         
         // capacity
@@ -374,50 +376,57 @@ public:
         pos += sizeof(size_t);
 
         // data
-        memcpy(&serial[pos], dataString->c_str(), dataString->size());
-        pos += dataString->size();
-        delete(dataString);
+        for (size_t i = 0; i < size_; i++)
+        {
+            memcpy(&serial[pos], serial_data[i]->data_, serial_data[i]->size_);
+            pos += serial_data[i]->size_;
+            delete(serial_data[i]);
+        }
+        delete[](serial_data);
 
         // missing
         memcpy(&serial[pos], missing_, sizeof(bool) * capacity_);
+        pos += sizeof(bool) * capacity_;
 
-        return serial;
+        SerialString* s = new SerialString(serial, pos);
+        delete[](serial);
+
+        return s;
     }
 
-    static StringArrayChunk* deserialize(char* serialized) {
+    static StringArrayChunk* deserialize(SerialString* serialized) {
         size_t pos = 0;
 
         // capacity
         size_t cap;
-        memcpy(&cap, &serialized[pos], sizeof(size_t));
+        memcpy(&cap, &serialized->data_[pos], sizeof(size_t));
         pos += sizeof(size_t);
         assert(cap != 0);
 
         StringArrayChunk* chunk = new StringArrayChunk(cap);
         
         // size
-        memcpy(&chunk->size_, &serialized[pos], sizeof(size_t));
+        memcpy(&chunk->size_, &serialized->data_[pos], sizeof(size_t));
         pos += sizeof(size_t);
 
         // data
         for (size_t i = 0; i < chunk->size_; i++)
         {
             size_t size;
-            memcpy(&size, &serialized[pos], sizeof(size_t));
+            memcpy(&size, &serialized->data_[pos], sizeof(size_t));
             pos += sizeof(size_t);
 
-            char* str = new char[size + 1];
-            str[size] = '\0';
-            memcpy(str, &serialized[pos], size);
+            SerialString* serial = new SerialString(&serialized->data_[pos], size);
             pos += size;
 
-            String* s = new String(str);
+            String* s = String::deserialize(serial);
             chunk->set(i, s);
             delete(s);
+            delete(serial);
         }        
 
         // missing
-        memcpy(&chunk->missing_, &serialized[pos], sizeof(bool) * chunk->capacity_);
+        memcpy(&chunk->missing_, &serialized->data_[pos], sizeof(bool) * chunk->capacity_);
 
         return chunk;
     }
@@ -530,16 +539,17 @@ public:
         return true;
     }
 
-    virtual char* serialize() {
-        StrBuff buf;
+    virtual SerialString* serialize() {
+        SerialString** chunk_serial = new SerialString*[chunks_];
+        size_t chunks_size = 0;
         for (size_t i = 0; i < chunks_; i++)
         {
-            buf.c(data_[i]->serialize());
+            chunk_serial[i] = data_[i]->serialize();
+            chunks_size += chunk_serial[i]->size_;
         }
-        String* dataString = buf.get();
+        
 
-        char* serial = new char[sizeof(size_t) + sizeof(size_t) + dataString->size() + 1];
-        serial[sizeof(size_t) + sizeof(size_t) + dataString->size()] = '\0';
+        char* serial = new char[sizeof(size_t) + sizeof(size_t) + chunks_size];
         size_t pos = 0;
 
         // chunks
@@ -551,31 +561,47 @@ public:
         pos += sizeof(size_t);
 
         // data
-        memcpy(&serial[pos], dataString->c_str(), dataString->size());
-        delete(dataString);
+        for (size_t i = 0; i < chunks_; i++)
+        {
+            memcpy(&serial[pos], &chunk_serial[i]->size_, sizeof(size_t));
+            pos += sizeof(size_t);
+
+            memcpy(&serial[pos], chunk_serial[i]->data_, chunk_serial[i]->size_);
+            pos += chunk_serial[i]->size_;
+            delete(chunk_serial[i]);
+        }
+        delete[](chunk_serial);
         
-        return serial;
+        SerialString* s = new SerialString(serial, pos);
+        delete[](serial);
+        return s;
     }
 
-    static StringArray* deserialize(char* serialized) {
+    static StringArray* deserialize(SerialString* serialized) {
         size_t chunks;
         size_t chunk_size;
         size_t pos = 0;
         
         // chunks
-        memcpy(&chunks, &serialized[pos], sizeof(size_t));
+        memcpy(&chunks, &serialized->data_[pos], sizeof(size_t));
         pos += sizeof(size_t);
 
         // chunk size
-        memcpy(&chunk_size, &serialized[pos], sizeof(size_t));
+        memcpy(&chunk_size, &serialized->data_[pos], sizeof(size_t));
         pos += sizeof(size_t);
 
         StringArray* arr = new StringArray(chunk_size, chunks * 2);
 
         // data
         for (size_t i = 0; i < chunks; i++) {
-            arr->data_[arr->chunks_++] = StringArrayChunk::deserialize(&serialized[pos]);
-            pos += strlen(arr->data_[i]->serialize());
+            size_t size;
+            memcpy(&size, &serialized->data_[pos], sizeof(size_t));
+            pos += sizeof(size_t);
+
+            SerialString* s = new SerialString(&serialized->data_[pos], size);
+            arr->data_[arr->chunks_++] = StringArrayChunk::deserialize(s);
+            pos += s->size_;
+            delete(s);
         }
 
         return arr;

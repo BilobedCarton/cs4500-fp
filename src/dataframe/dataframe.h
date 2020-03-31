@@ -7,6 +7,9 @@
 #include "../utils/array.h"
 #include "../utils/string.h"
 #include "../utils/thread.h"
+
+#include "../store/kvstore.h"
+
 #include "schema.h"
 #include "column.h"
 #include "row.h"
@@ -42,7 +45,7 @@ class Rower : public Object {
  * holds values of the same type (I, S, B, F). A dataframe has a schema that
  * describes it.
  */
-class DataFrame : public Object {
+class DataFrame : public SerializableObject {
  public:
   Schema* _schema;
   Array* _cols;
@@ -55,16 +58,16 @@ class DataFrame : public Object {
     {
       switch(df.get_schema().col_type(i)) {
         case 'I':
-          add_column(new IntColumn(), df.get_schema().col_name(i));
+          add_column(new IntColumn());
           break;
         case 'F':
-          add_column(new DoubleColumn(), df.get_schema().col_name(i));
+          add_column(new DoubleColumn());
           break;
         case 'B':
-          add_column(new BoolColumn(), df.get_schema().col_name(i));
+          add_column(new BoolColumn());
           break;
         case 'S':
-          add_column(new StringColumn(), df.get_schema().col_name(i));
+          add_column(new StringColumn());
           break;
         default:
           break;
@@ -116,8 +119,8 @@ class DataFrame : public Object {
   /** Adds a column this dataframe, updates the schema, the new column
     * is external, and appears as the last column of the dataframe, the
     * name is optional and external. A nullptr colum is undefined. */
-  void add_column(Column* col, String* name) {
-    _schema->add_column(col->get_type(), name);
+  void add_column(Column* col) {
+    _schema->add_column(col->get_type());
     _cols->append(col->clone());
   }
 
@@ -131,19 +134,19 @@ class DataFrame : public Object {
   double get_double(size_t col, size_t row) { return get_column_obj(col)->as_double()->get(row); }
   String* get_string(size_t col, size_t row) { return get_column_obj(col)->as_string()->get(row); }
  
-  /** Return the offset of the given column name or -1 if no such col. */
-  int get_col(String& col) {
-    int idx = _schema->col_idx(col.c_str());
-    if(idx == _schema->ncol) return -1;
-    return idx;
-  }
+  // /** Return the offset of the given column name or -1 if no such col. */
+  // int get_col(String& col) {
+  //   int idx = _schema->col_idx(col.c_str());
+  //   if(idx == _schema->ncol) return -1;
+  //   return idx;
+  // }
  
-  /** Return the offset of the given row name or -1 if no such row. */
-  int get_row(String& col) {
-    int idx = _schema->row_idx(col.c_str());
-    if(idx == _schema->nrow) return -1;
-    return idx;
-  }
+  // /** Return the offset of the given row name or -1 if no such row. */
+  // int get_row(String& col) {
+  //   int idx = _schema->row_idx(col.c_str());
+  //   if(idx == _schema->nrow) return -1;
+  //   return idx;
+  // }
  
   /** Set the value at the given column and row to the given value.
     * If the column is not  of the right type or the indices are out of
@@ -183,7 +186,7 @@ class DataFrame : public Object {
   /** Add a row at the end of this dataframe. The row is expected to have
    *  the right schema and be filled with values, otherwise undedined.  */
   void add_row(Row& row) {
-    _schema->add_row(nullptr);
+    _schema->add_row();
     for (int i = 0; i < _schema->width(); ++i)
     {
       switch(_schema->col_type(i)) {
@@ -293,6 +296,151 @@ class DataFrame : public Object {
   Object* clone() {
     Rower r;
     return filter(r);
+  }
+
+  SerialString* serialize() {
+    size_t size = 0;
+
+    SerialString* sch_serial = _schema->serialize();
+    size += sch_serial->size_;
+
+    SerialString** col_serial = new SerialString*[ncols()];
+    for (size_t i = 0; i < ncols(); i++) {
+      col_serial[i] = get_column_obj(i)->serialize();
+      size += col_serial[i]->size_;
+    }
+    
+    char* serialStr = new char[size];
+    size_t pos = 0;
+
+    memcpy(serialStr, sch_serial->data_, sch_serial->size_);
+    pos += sch_serial->size_;
+    delete(sch_serial);
+
+    for (size_t i = 0; i < ncols(); i++) {
+      memcpy(&serialStr[pos], col_serial[i]->data_, col_serial[i]->size_);
+      pos += col_serial[i]->size_;
+      delete(col_serial[i]);
+    }
+    delete[](col_serial);
+
+    SerialString* serial = new SerialString(serialStr, size);
+    delete[](serialStr);
+
+    return serial;
+  }
+
+  static DataFrame* deserialize(SerialString* serialized) {
+    Schema empty("");
+    DataFrame* df = new DataFrame(empty);
+
+    size_t pos = 0;
+    Schema* s = Schema::deserialize(serialized);
+    pos += sizeof(size_t) + sizeof(size_t) + s->width();
+
+    for (size_t i = 0; i < s->width(); i++)
+    {
+      Column* c;
+      SerialString* serial = new SerialString(&serialized->data_[pos + 1], serialized->size_ - (pos + 1));
+      switch(s->col_type(i)) {
+        case 'I':
+          c = IntColumn::deserialize(serial);
+          break;
+        case 'B':
+          c = BoolColumn::deserialize(serial);
+          break;
+        case 'F':
+          c = DoubleColumn::deserialize(serial);
+          break;
+        case 'S':
+          c = StringColumn::deserialize(serial);
+          break;
+        default:
+          c = nullptr;
+          assert(false);
+          break;
+      }
+      
+      SerialString* temp = c->serialize();
+      pos += temp->size_;
+      df->add_column(c);
+      delete(c);
+      delete(temp);
+      delete(serial);
+    }
+    delete(s);
+    return df;
+  }
+
+  // DATAFRAME STATIC BUILDERS
+  // from array of given size
+  static DataFrame* fromArray(Key * k, KVStore* store, size_t size, int* arr) {
+    Schema s("");
+    DataFrame* df = new DataFrame(s);
+    IntColumn col(size, arr);
+    df->add_column(&col);
+
+    Value v(df);
+    store->put(k, &v);
+    return df;
+  }
+
+  static DataFrame* fromArray(Key * k, KVStore* store, size_t size, bool* arr) {
+    Schema s("");
+    DataFrame* df = new DataFrame(s);
+    BoolColumn col(size, arr);
+    df->add_column(&col);
+
+    Value v(df);
+    store->put(k, &v);
+    return df;
+  }
+
+  static DataFrame* fromArray(Key * k, KVStore* store, size_t size, double* arr) {
+    Schema s("");
+    DataFrame* df = new DataFrame(s);
+    DoubleColumn col(size, arr);
+    df->add_column(&col);
+    
+    Value v(df);
+    store->put(k, &v);
+    return df;
+  }
+
+  static DataFrame* fromArray(Key * k, KVStore* store, size_t size, String** arr) {
+    Schema s("");
+    DataFrame* df = new DataFrame(s);
+    StringColumn col(size, arr);
+    df->add_column(&col);
+    
+    Value v(df);
+    store->put(k, &v);
+    return df;
+  }
+
+  // from scalar value
+  static DataFrame* fromScalar(Key* k, KVStore* store, int scalar) {
+    int* arr = new int[1];
+    arr[0] = scalar;
+    return fromArray(k, store, 1, arr);
+  }
+
+  static DataFrame* fromScalar(Key* k, KVStore* store, bool scalar) {
+    bool* arr = new bool[1];
+    arr[0] = scalar;
+    return fromArray(k, store, 1, arr);
+  }
+
+  static DataFrame* fromScalar(Key* k, KVStore* store, double scalar) {
+    double* arr = new double[1];
+    arr[0] = scalar;
+    return fromArray(k, store, 1, arr);
+  }
+
+  static DataFrame* fromScalar(Key* k, KVStore* store, String* scalar) {
+    String** arr = new String*[1];
+    arr[0] = scalar;
+    return fromArray(k, store, 1, arr);
   }
 };
 

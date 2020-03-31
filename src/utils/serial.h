@@ -4,9 +4,35 @@
 
 #include "object.h"
 
+class SerialString {
+public:
+	char* data_;
+	size_t size_;
+
+	SerialString(const char* data, size_t size) {
+		size_ = size;
+		data_ = new char[size];
+		memcpy(data_, data, size);
+	}
+
+	SerialString(char* data, size_t size) {
+		size_ = size;
+		data_ = new char[size];
+		memcpy(data_, data, size);
+	}
+
+	~SerialString() {
+		delete[](data_);
+	}
+
+	SerialString* clone() {
+		return new SerialString(data_, size_);
+	}
+};
+
 class Serializable {
 public:
-	virtual char* serialize() { return nullptr; }
+	virtual SerialString* serialize() { return nullptr; }
 };
 
 class SerializableObject : public Object, public Serializable {

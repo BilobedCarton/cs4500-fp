@@ -14,7 +14,7 @@
  */
 class Value : public Sys {
 public:
-    char* serialized_; // owned
+    SerialString* serialized_; // owned
 
     /**
      * @brief Construct a new Value object
@@ -38,7 +38,7 @@ public:
      * Checks if serialized exists because child classes may have deleted it (caching)
      */
     virtual ~Value() {
-        if(serialized_ != nullptr) delete[](serialized_);
+        if(serialized_ != nullptr) delete(serialized_);
     }
 
     /**
@@ -46,7 +46,7 @@ public:
      * 
      * @return char* - the serial string
      */
-    virtual char* serialized() { return serialized_; }
+    virtual SerialString* serialized() { return serialized_; }
 
     /**
      * @brief determines if this value is cachable and can save memory usage
@@ -63,36 +63,9 @@ public:
      */
     virtual Value* clone() {
         Value* v = new Value();
-        v->serialized_ = duplicate(serialized_);
+        v->serialized_ = serialized()->clone();
         return v;
     }
-
-    // /**
-    //  * @brief deserializes this value as a dataframe
-    //  * 
-    //  * @return DataFrame* - the dataframe represented by this value
-    //  */
-    // DataFrame* asDataFrame() {
-    //     return DataFrame::deserialize(serialized());
-    // }
-
-    // /**
-    //  * @brief deserializes this value as a column
-    //  * 
-    //  * @return Column* - the column represented by this value
-    //  */
-    // Column* asColumn() {
-    //     return Column::deserialize(serialized());
-    // }
-
-    // /**
-    //  * @brief deserializes this value as a column chunk
-    //  * 
-    //  * @return ColumnChunk* - the column chunk represented by this value
-    //  */
-    // ColumnChunk* asChunk() {
-    //     return ColumnChunk::deserialize(serialized());
-    // }
 };
 
 /**
@@ -146,8 +119,8 @@ public:
         file_ = new char[strlen(file) + 1];
         strcpy(file_, file);
         file_[strlen(file)] = '\0';
-        char* serialized = so->serialize();
-        size_ = strlen(serialized);
+        SerialString* serialized = so->serialize();
+        size_ = serialized->size_;
 
         FILE* f = fopen(file_, "r+");
         assert(f != nullptr);
@@ -170,14 +143,16 @@ public:
      * 
      */
     void cache() {
-        serialized_ = new char[size_ / sizeof(char) + 1];
-        serialized_[size_ / sizeof(char)] = '\0';
+        char * serialized = new char[size_ / sizeof(char)];
 
         FILE* f = fopen(file_, "r");
         assert(f != nullptr);
         assert(fseek(f, position_, SEEK_SET) == 0);
         assert(fread(serialized_, sizeof(char), size_ / sizeof(char), f) == size_);
         fclose(f);
+
+        serialized_ = new SerialString(serialized, size_);
+        delete[](serialized);
     }
 
     /**
@@ -195,7 +170,7 @@ public:
      * 
      * @return char* 
      */
-    char* serialized() {
+    SerialString* serialized() {
         last_access_ = time(NULL);
         if(serialized_ == nullptr) {
             cache();

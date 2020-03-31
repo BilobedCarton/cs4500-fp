@@ -1,3 +1,8 @@
+apps:
+	g++ -o apps -g -Wall -std=c++17 ./src/applications/apps.cpp
+	./apps
+	-rm apps
+
 run: build test clean
 
 build: main

@@ -1,12 +1,14 @@
 #pragma once
 
 #include "../client/application.h"
+#include "../dataframe/dataframe.h"
+#include "../store/key.h"
 
 class Demo : public Application {
 public:
-  Key main("main",0);
-  Key verify("verif",0);
-  Key check("ck",0);
+  Key* main = new Key("main", 0);
+  Key* verify = new Key("verif", 0);
+  Key* check = new Key("ck", 0);
  
   Demo(size_t idx): Application(idx) {}
  
@@ -23,21 +25,25 @@ public:
     double* vals = new double[SZ];
     double sum = 0;
     for (size_t i = 0; i < SZ; ++i) sum += vals[i] = i;
-    DataFrame::fromArray(&main, &kv, SZ, vals);
-    DataFrame::fromScalar(&check, &kv, sum);
+    delete DataFrame::fromArray(main, &kv, SZ, vals);
+    delete DataFrame::fromScalar(check, &kv, sum);
+    pln("Producer done.");
   }
  
   void counter() {
-    DataFrame* v = kv.waitAndGet(main);
-    size_t sum = 0;
+    DataFrame* v = DataFrame::deserialize(kv.waitAndGet(main)->serialized());
+    pln("Counter got frame.");
+    double sum = 0;
     for (size_t i = 0; i < 100*1000; ++i) sum += v->get_double(0,i);
     p("The sum is  ").pln(sum);
-    DataFrame::fromScalar(&verify, &kv, sum);
+    delete DataFrame::fromScalar(verify, &kv, sum);
+    pln("Counter done.");
   }
  
   void summarizer() {
-    DataFrame* result = kv.waitAndGet(verify);
-    DataFrame* expected = kv.waitAndGet(check);
+    DataFrame* result = DataFrame::deserialize(kv.waitAndGet(verify)->serialized());
+    DataFrame* expected = DataFrame::deserialize(kv.waitAndGet(check)->serialized());
     pln(expected->get_double(0,0)==result->get_double(0,0) ? "SUCCESS":"FAILURE");
+    pln("Summarizer done.");
   }
 };

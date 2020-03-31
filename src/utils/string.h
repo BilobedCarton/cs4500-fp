@@ -4,6 +4,7 @@
 #include <string>
 #include <cassert>
 #include "object.h"
+#include "serial.h"
 
 /** An immutable string class that wraps a character array.
  * The character array is zero terminated. The size() of the
@@ -11,7 +12,7 @@
  * work by copy, but there are exceptions (this is mostly to support
  * large strings and avoid them being copied).
  *  author: vitekj@me.com */
-class String : public Object {
+class String : public Object, public Serializable {
 public:
     size_t size_; // number of characters excluding terminate (\0)
     char *cstr_;  // owned; char array
@@ -81,6 +82,20 @@ public:
         for (size_t i = 0; i < size_; ++i)
             hash = cstr_[i] + (hash << 6) + (hash << 16) - hash;
         return hash;
+    }
+
+    SerialString* serialize() {
+        char* s = new char[size() + sizeof(size_t)];
+        memcpy(s, &size_, sizeof(size_t));
+        memcpy(s + sizeof(size_t), cstr_, size_);
+
+        SerialString* serial = new SerialString(s, size_ + sizeof(size_t));
+        delete[](s);
+        return serial;
+    }
+
+    static String* deserialize(SerialString* serial) {
+        return new String(serial->data_ + sizeof(size_t));
     }
  };
 
