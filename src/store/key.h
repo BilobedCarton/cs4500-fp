@@ -8,7 +8,7 @@
 /**
  * A simple Key class used for associating and accessing objects within a KV store.
  **/
-class Key : public Object {
+class Key : public SerializableObject {
     public:
     char* name_; // owned
     size_t idx_; // the index of the node hosting the Dataframe linked to this key
@@ -64,5 +64,44 @@ class Key : public Object {
     // inherited from object
     Object* clone() {
         return new Key(name_, idx_);
+    }
+
+    SerialString* serialize() {
+        size_t name_len = strlen(name_);
+        char* arr = new char[sizeof(size_t) + name_len + sizeof(size_t)];
+        size_t pos = 0;
+
+        memcpy(arr, &name_len, sizeof(size_t));
+        pos += sizeof(size_t);
+
+        memcpy(arr + pos, name_, name_len);
+        pos += name_len;
+
+        memcpy(arr + pos, &idx_, sizeof(size_t));
+        pos += sizeof(size_t);
+
+        SerialString* ss = new SerialString(arr, pos);
+        delete[](arr);
+        return ss;
+    }
+
+    static Key* deserialize(SerialString* serial) {
+        size_t pos = 0;
+
+        size_t name_len;
+        memcpy(&name_len, serial->data_, sizeof(size_t));
+        pos += sizeof(size_t);
+
+        char* name = new char[name_len];
+        memcpy(name, serial->data_ + pos, name_len);
+        pos += name_len;
+
+        size_t idx;
+        memcpy(&idx, serial->data_ + pos, sizeof(size_t));
+
+        Key* k = new Key(name, idx);
+        delete[](name);
+
+        return k;
     }
 };

@@ -1,55 +1,23 @@
 #pragma once
 
-//#include <unistd.h>
+#include "object.h"
 
-#include "../utils/object.h"
-#include "key.h"
-#include "value.h"
-
-#define STARTING_CAPACITY 8
-#define GROWTH_FACTOR 4
-#define GROWTH_THRESHOLD 0.5
-
-static size_t ID_COUNTER = 0; // used for giving new KVStores a unique id
-
-/**
- * @brief A node stored in the KVStore that allows for collision handling
- * 
- */
-class KVStore_Node : public Object {
+class Node {
 public:
-    Key* k_; // owned
-    Value* v_; // owned
-    KVStore_Node* next_; // owned
+    Object* k_;
+    Object* v_;
+    Node * next_;
 
-    /**
-     * @brief Construct a new kvstore node object
-     * 
-     * @param k - key
-     * @param v - value
-     */
-    KVStore_Node(Key* k, Value* v) {
-        k_ = dynamic_cast<Key *>(k->clone());
+    Node(Object* k, Object* v) {
+        k_ = k->clone();
         v_ = v->clone();
-        next_ = nullptr;
     }
 
-    /**
-     * @brief Construct a new kvstore node object
-     * 
-     * @param k - key
-     * @param v - value
-     * @param next - next node in the cycle
-     */
-    KVStore_Node(Key* k, Value* v, KVStore_Node* next) : KVStore_Node(k, v) {
+    Node(Object* k, Object* v, Node* next) : Node(k, v) {
         next_ = next;
     }
 
-    /**
-     * @brief Destroy the kvstore node object
-     * If this has a linked node in succession, we delete that too
-     */
-    ~KVStore_Node() {
+    ~Node() {
         delete(k_);
         delete(v_);
         if(next_ != nullptr) delete(next_);
@@ -70,7 +38,7 @@ public:
      * 
      * @param n - the node to be appended
      */
-    void pushBack(KVStore_Node* n) {
+    void pushBack(Node* n) {
         if(next_ == nullptr) {
             next_ = n;
         }
@@ -82,10 +50,10 @@ public:
      * 
      * @return KVStore_Node* - the popped node
      */
-    KVStore_Node* pop() {
+    Node* pop() {
         if(next_ != nullptr) {
             if(next_->next_ == nullptr) {
-                KVStore_Node* node = next_;
+                Node* node = next_;
                 next_ = nullptr;
                 return node;
             }
@@ -101,7 +69,7 @@ public:
      * @param k - the key of the node to find
      * @return KVStore_Node* - the node
      */
-    KVStore_Node* find(Key* k) {
+    Node* find(Object* k) {
         if(k->equals(k_)) return this;
         else if(next_ == nullptr) {
             return nullptr;
@@ -116,8 +84,8 @@ public:
      * @param k - the key mapped to the value
      * @return Value* - the value mapped to the key
      */
-    Value* getValue(Key* k) {
-        KVStore_Node* node = find(k);
+    Object* getValue(Object* k) {
+        Node* node = find(k);
         if(node == nullptr) return nullptr;
         return node->v_;
     }
@@ -128,9 +96,9 @@ public:
      * @param k - the key
      * @param v - the new value
      */
-    void set(Key* k, Value* v) {
-        KVStore_Node* node = find(k);
-        if(node == nullptr) pushBack(new KVStore_Node(k, v));
+    void set(Object* k, Object* v) {
+        Node* node = find(k);
+        if(node == nullptr) pushBack(new Node(k, v));
         else { 
             delete(node->v_);
             node->v_ = v->clone();
@@ -138,25 +106,27 @@ public:
     }
 };
 
+#define STARTING_CAPACITY 8
+#define GROWTH_FACTOR 4
+#define GROWTH_THRESHOLD 0.5
+
 /**
- * @brief A Key Value Store where keys are a string and values are a serialized object in string form
+ * @brief A map where keys are an object and values are an object
  * 
  */
-class KVStore : public Object {
+class Map : public Object {
 public:
-    size_t id_;
-    KVStore_Node** nodes_; // owned, elements owned
+    Node** nodes_; // owned, elements owned
     size_t capacity_; 
 
     /**
-     * @brief Construct a new KVStore object with a given capacitys
+     * @brief Construct a new map object with a given capacity
      * 
      * @param capacity - the starting capacity of this store
      */
-    KVStore(size_t capacity) {
-        id_ = ID_COUNTER++;
+    Map(size_t capacity) {
         capacity_ = capacity;
-        nodes_ = new KVStore_Node*[capacity_];
+        nodes_ = new Node*[capacity_];
         for (size_t i = 0; i < capacity_; i++)
         {
             nodes_[i] = nullptr;
@@ -165,16 +135,16 @@ public:
     }
 
     /**
-     * @brief Construct a new KVStore object with the default starting capacity
+     * @brief Construct a new map object with the default starting capacity
      * 
      */
-    KVStore() : KVStore(STARTING_CAPACITY) {}
+    Map() : Map((size_t)STARTING_CAPACITY) {}
 
     /**
      * @brief Destroy the KVStore object (destroys the nodes too)
      * 
      */
-    ~KVStore() {
+    ~Map() {
         for(size_t i = 0; i < capacity_; i++) {
             if(nodes_[i] != nullptr) delete(nodes_[i]);
         }
@@ -182,7 +152,7 @@ public:
     }
 
     /**
-     * @brief gets the number of key value pairs stored in this KVStore
+     * @brief gets the number of key value pairs stored in this map
      * 
      * @return size_t - the number of kv pairs
      */
@@ -201,7 +171,7 @@ public:
      * @param k - the key
      * @return size_t - the index
      */
-    size_t get_position(Key* k) {
+    size_t get_position(Object* k) {
         return k->hash() % capacity_;
     }
 
@@ -210,7 +180,7 @@ public:
      * 
      * @param node - the node to be inserted
      */
-    void put_node(KVStore_Node* node) {
+    void put_node(Node* node) {
         if(nodes_[get_position(node->k_)] == nullptr) {
             nodes_[get_position(node->k_)] = node;
         } else {
@@ -227,14 +197,14 @@ public:
 
         // grow the array
         capacity_ *= GROWTH_FACTOR; 
-        KVStore_Node** old = nodes_;
-        nodes_ = new KVStore_Node*[capacity_];
+        Node** old = nodes_;
+        nodes_ = new Node*[capacity_];
 
         // reinsert each node to its new proper location
         for (size_t i = 0; i < capacity_ / GROWTH_FACTOR; i++)
         {
             if(old[i] != nullptr) {
-                KVStore_Node* node = old[i]->pop();
+                Node* node = old[i]->pop();
                 while(node != nullptr) {
                     put_node(node);
                     node = old[i]->pop();
@@ -251,20 +221,9 @@ public:
      * @param k - the key
      * @return Value* - the linked value
      */
-    Value* get(Key* k) {
+    Object* get(Object* k) {
         if(nodes_[get_position(k)] == nullptr) return nullptr;
         return nodes_[get_position(k)]->getValue(k);
-    }
-
-    /**
-     * @brief waits until a KV pair with the given key exists and then returns the value
-     * 
-     * @param k - the key
-     * @return Value* - the linked value
-     */
-    Value* waitAndGet(Key* k) {
-        while(get(k) == nullptr) { sleep(1); } // TODO: pick actual sleeping time
-        return get(k);
     }
 
     /**
@@ -274,11 +233,16 @@ public:
      * @param v - the value
      * @return KVStore* - this
      */
-    KVStore* put(Key* k, Value* v) {
+    Map* put(Object* k, Object* v) {
         grow();
         size_t pos = get_position(k);
-        if(nodes_[pos] == nullptr) nodes_[pos] = new KVStore_Node(k, v);
+        if(nodes_[pos] == nullptr) nodes_[pos] = new Node(k, v);
         else nodes_[pos]->set(k, v);
+        return this;
+    }
+
+    // TODO: actually clone the map
+    Object* clone() {
         return this;
     }
 };
