@@ -11,7 +11,7 @@
 class Key : public SerializableObject {
     public:
     char* name_; // owned
-    size_t idx_; // the index of the node hosting the Dataframe linked to this key
+    size_t idx_; // the index of the node hosting the store with this key
 
     /**
      * @brief Construct a new Key object

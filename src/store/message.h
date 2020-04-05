@@ -10,8 +10,7 @@
 #include "key.h"
 #include "value.h"
 
-enum class MsgType { Register = 0, Get, Put, WaitAndGet, Directory };
-
+enum class MsgType { Register = 0, Get, Put, Status, Directory };
 
 class Message : public SerializableObject {
 public:
@@ -67,8 +66,8 @@ public:
                 return Get::deserialize(serial);
             case MsgType::Put:
                 return Put::deserialize(serial);
-            case MsgType::WaitAndGet:
-                return WaitAndGet::deserialize(serial);
+            case MsgType::Status:
+                return Status::deserialize(serial);
             case MsgType::Directory:
                 return Directory::deserialize(serial);
             default:
@@ -141,7 +140,7 @@ public:
         k_ = k.clone();
     }
 
-    Get(size_t target, Key* k) : Message(MsgType::Get, target) {
+    Get(Key* k) : Message(MsgType::Get, k->idx_) {
         k_ = k->clone()
     }
 
@@ -202,12 +201,12 @@ public:
         size_t size = g_ss->size_ + v_ss->size_;
         char* arr = new char[size];
         memcpy(arr, g_ss->data_, g_ss->size_);
-        memcpy(arr, v_ss->data_, v_ss->size_);
+        memcpy(arr + g_ss->size_, v_ss->data_, v_ss->size_);
 
         delete(g_ss);
         delete(v_ss);
         
-        SerialString* ss = SerialString(arr, size);
+        SerialString* ss = new SerialString(arr, size);
         delete[](arr);
 
         return ss;
@@ -230,16 +229,52 @@ public:
     }
 };
 
-class WaitAndGet : public Get {
+class Status : public Message {
 public:
+    Value* v_; // owned
 
-    WaitAndGet(size_t target, Key* k) : Get(target, k) {
-        type_ = MsgType::WaitAndGet;
+    Status(Message& m, Value& v) : Message(m) {
+        v_ = v.clone();
     }
 
-    static WaitAndGet* deserialize(SerialString* string) {
-        Get* g = Get::deserialize(string);
-        return dynamic_cast<WaitAndGet *>(g);
+    Status(size_t target, Value* v) : Message(MsgType::Status, target) {
+        v_ = v->clone();
+    }
+
+    ~Status() {
+        delete(v_);
+    }
+
+    SerialString* serialize() {
+        SerialString* m_ss = Message::serialize();
+        SerialString* v_ss = v_->serialized();
+
+        size_t size = m_ss->size_ + v_ss->size_;
+        char* arr = new char[size];
+        memcpy(arr, m_ss->data_, m_ss->size_);
+        memcpy(arr + m_ss->size_, v_ss->data_, v_ss->size_);
+
+        delete(m_ss);
+        delete(v_ss);
+
+        SerialString* ss = new SerialString(arr, size);
+        delete[](arr);
+
+        return ss;
+    }
+
+    static Status* deserialize(SerialString* string) {
+        Message* m = Message::deserialize(string);
+
+        SerialString* val_substr = new SerialString(string->data_ + (3 * sizeof(size_t)), string->size_ - (3 * sizeof(size_t)));
+        Value* v = Value::deserialize(val_substr);
+        delete(val_substr);
+
+        Status* s = new Status(*m, *v);
+        
+        delete(m);
+        delete(v);
+        return s;
     }
 };
 

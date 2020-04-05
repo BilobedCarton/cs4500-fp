@@ -5,12 +5,12 @@
 #include "../utils/object.h"
 #include "key.h"
 #include "value.h"
+#include "message.h"
+#include "network.h"
 
 #define STARTING_CAPACITY 8
 #define GROWTH_FACTOR 4
 #define GROWTH_THRESHOLD 0.5
-
-static size_t ID_COUNTER = 0; // used for giving new KVStores a unique id
 
 /**
  * @brief A node stored in the KVStore that allows for collision handling
@@ -144,7 +144,10 @@ public:
  */
 class KVStore : public Object {
 public:
-    size_t id_;
+    size_t idx_;
+    Lock lock_;
+    NetworkIfc* network_; // unowned
+    NetworkListener listener_;
     KVStore_Node** nodes_; // owned, elements owned
     size_t capacity_; 
 
@@ -153,28 +156,33 @@ public:
      * 
      * @param capacity - the starting capacity of this store
      */
-    KVStore(size_t capacity) {
-        id_ = ID_COUNTER++;
+    KVStore(size_t idx, NetworkIfc* network, size_t capacity) : listener_(this) {
+        idx_ = idx;
+        network_ = network;
+
         capacity_ = capacity;
         nodes_ = new KVStore_Node*[capacity_];
         for (size_t i = 0; i < capacity_; i++)
         {
             nodes_[i] = nullptr;
         }
-        
+
+        listener_->start();
     }
 
     /**
      * @brief Construct a new KVStore object with the default starting capacity
      * 
      */
-    KVStore() : KVStore(STARTING_CAPACITY) {}
+    KVStore(size_t idx, NetworkIfc* network) : KVStore(idx, network, STARTING_CAPACITY) {}
 
     /**
      * @brief Destroy the KVStore object (destroys the nodes too)
      * 
      */
     ~KVStore() {
+        listener_.store_ = nullptr;
+        listener_.join();
         for(size_t i = 0; i < capacity_; i++) {
             if(nodes_[i] != nullptr) delete(nodes_[i]);
         }
@@ -223,6 +231,7 @@ public:
      * 
      */
     void grow() {
+
         if(((double)count()) / capacity_ <= GROWTH_THRESHOLD) return;
 
         // grow the array
@@ -247,13 +256,19 @@ public:
 
     /**
      * @brief gets the value linked to the given key
+     * Force wait and get if provided with external key (key in another node)
      * 
      * @param k - the key
      * @return Value* - the linked value
      */
     Value* get(Key* k) {
+        if(k->idx_ != idx_) return waitAndGet(k);
+
+        lock_.lock();
         if(nodes_[get_position(k)] == nullptr) return nullptr;
-        return nodes_[get_position(k)]->getValue(k);
+        Value* v = nodes_[get_position(k)]->getValue(k);
+        lock_.unlock();
+        return v;
     }
 
     /**
@@ -263,8 +278,18 @@ public:
      * @return Value* - the linked value
      */
     Value* waitAndGet(Key* k) {
-        while(get(k) == nullptr) { sleep(1); } // TODO: pick actual sleeping time
-        return get(k);
+        Value* v;
+        if(k->idx_ == idx) {
+            while(get(k) == nullptr) { sleep(1); } // TODO: pick actual sleeping time
+            v = get(k);
+        }
+        else { // send a request on the network
+            network_->send_message(new Get(k));
+            Status* s = listener_->await_status();
+            v = s->v_->clone();
+            delete(s);
+        }
+        return v;
     }
 
     /**
@@ -275,10 +300,66 @@ public:
      * @return KVStore* - this
      */
     KVStore* put(Key* k, Value* v) {
+        lock_.lock()
         grow();
         size_t pos = get_position(k);
         if(nodes_[pos] == nullptr) nodes_[pos] = new KVStore_Node(k, v);
         else nodes_[pos]->set(k, v);
+        lock_.unlock();
         return this;
+    }
+};
+
+class NetworkListener : public Thread {
+public:
+    Lock lock_;
+    KVStore* store_; // external
+    Status* s_; // owned
+
+    NetworkListener(KVStore* store) {
+        store_ = store;
+        s_ = nullptr;
+    }
+
+    ~NetworkListener() { if(s_ != nullptr) delete(s_); }
+
+    Status* await_status() {
+        while(s_ == nullptr) lock_.wait(); // wait until s_ available
+        Status* s = s_;
+        s_ = nullptr;
+        lock_.unlock();
+        lock_.notify_all(); // s_ consumed
+        return s;
+    }
+
+    void run() {
+        while(store_ != nullptr) { // go forever
+            Message* m = store_->network_->receive_message();
+            switch(m->type_) {
+                case MsgType::Register:
+                    break; // ignore
+                case MsgType::Get:
+                    Get* g = dynamic_cast<Get *>(m);
+                    store_->network_->send_message(new Status(g->sender_, store_->waitAndGet(g->k_)));
+                    delete(g);
+                    break;
+                case MsgType::Put:
+                    Put* p = dynamic_cast<Put *>(m);
+                    store_->put(p->k_, p->v_);
+                    delete(p);
+                    break;
+                case MsgType::Status:
+                    if(s_ != nullptr) lock_.wait(); // Wait until s_ consumed
+                    s_ = dynamic_cast<Status *>(m);
+                    lock_.unlock();
+                    lock_.notify_all(); // s_ available
+                    break;
+                case MsgType::Directory:
+                    break; // ignore
+                default:
+                    assert(false);
+                    return;
+            }
+        }
     }
 };

@@ -98,6 +98,11 @@ public:
         delete(tid);
         return msgques_.get(idx)->pop();
     }
+
+    // return this because we're faking the network
+    Object* clone() {
+        return this;
+    }
 };
 
 class NodeInfo : public Object {
@@ -202,6 +207,7 @@ public:
         SerialString* ss = msg->serialize();
         send(conn, &ss->size_, sizeof(size_t), 0);
         send(conn, ss->data_, ss->size_, 0);
+        delete(msg);
     }
 
     Message* receive_message() {
