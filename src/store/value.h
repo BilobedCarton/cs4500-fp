@@ -24,6 +24,10 @@ public:
         serialized_ = nullptr;
     }
 
+    Value(SerialString* ss) {
+        serialized_ = ss->clone();
+    }
+
     /**
      * @brief Construct a new Value object
      * 

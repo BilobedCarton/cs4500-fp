@@ -20,14 +20,13 @@ public:
 
     Message(Message& m) {
         type_ = m.type_;
-        target = m.target_;
+        target_ = m.target_;
         sender_ = m.sender_;
     }
 
     Message(MsgType type, size_t target) {
         type_ = type;
         target_ = target;
-        sender_ = sender;
     }
 
     Message(size_t type, size_t target) : Message(static_cast<MsgType>(type), target) { }
@@ -35,9 +34,9 @@ public:
     SerialString* serialize() {
         char* arr = new char[3 * sizeof(size_t)];
         size_t type = static_cast<size_t>(type_);
-        memccpy(arr, &type, sizeof(size_t));
-        memccpy(arr + sizeof(size_t), &target_, sizeof(size_t));
-        memccpy(arr + (2 *sizeof(size_t)), &sender_, sizeof(size_t));
+        memcpy(arr, &type, sizeof(size_t));
+        memcpy(arr + sizeof(size_t), &target_, sizeof(size_t));
+        memcpy(arr + (2 *sizeof(size_t)), &sender_, sizeof(size_t));
 
         SerialString* ss = new SerialString(arr, 3 * sizeof(size_t));
         delete[](arr);
@@ -53,27 +52,9 @@ public:
         memcpy(&target, serial->data_ + sizeof(size_t), sizeof(size_t));
         memcpy(&sender, serial->data_ + (2 * sizeof(size_t)), sizeof(size_t));
 
-        return new Message(type, target, sender);
-    }
-
-    static Message* deserialize(SerialString* serial) {
-        size_t type;
-        memcpy(&type, serial->data_, sizeof(size_t));
-        switch(static_cast<MsgType>(type)) {
-            case MsgType::Register:
-                return Register::deserialize(serial);
-            case MsgType::Get:
-                return Get::deserialize(serial);
-            case MsgType::Put:
-                return Put::deserialize(serial);
-            case MsgType::Status:
-                return Status::deserialize(serial);
-            case MsgType::Directory:
-                return Directory::deserialize(serial);
-            default:
-                assert(false);
-                return nullptr;
-        }
+        Message* m = new Message(type, target);
+        m->sender_ = sender;
+        return m;
     }
 };
 
@@ -90,7 +71,7 @@ public:
     Register(String& ip, size_t p) : Message(MsgType::Register, 0) {
         client.sin_family = AF_INET;
         client.sin_port = htons(p);
-        inet_aton(ip.c_str(), &client.sin_addr.s_addr);
+        inet_aton(ip.c_str(), &client.sin_addr);
 
         port = p;
     } 
@@ -118,7 +99,7 @@ public:
     static Register* deserialize(SerialString* string) {
         Message* m = Message::deserialize_(string);
 
-        SerialString* substr = new SerialString(string->data_ + (3 * sizeof(size_t), string->size_ - (3 * sizeof(size_t));
+        SerialString* substr = new SerialString(string->data_ + (3 * sizeof(size_t)), string->size_ - (3 * sizeof(size_t)));
         sockaddr_in c;
         size_t p;
 
@@ -137,11 +118,11 @@ public:
     Key* k_; // owned
 
     Get(Message& m, Key& k) : Message(m) {
-        k_ = k.clone();
+        k_ = dynamic_cast<Key *>(k.clone());
     }
 
     Get(Key* k) : Message(MsgType::Get, k->idx_) {
-        k_ = k->clone()
+        k_ = dynamic_cast<Key *>(k->clone());
     }
 
     ~Get() { delete(k_); }
@@ -158,7 +139,7 @@ public:
         delete(m_ss);
         delete(k_ss);
 
-        SerialString* ss = SerialString(arr, size);
+        SerialString* ss = new SerialString(arr, size);
         delete[](arr);
 
         return ss;
@@ -185,18 +166,19 @@ public:
 
     Put(Message& m, Key& k, Value& v) : Get(m, k) {
         v_ = v.clone();
+        type_ = MsgType::Put;
     }
 
-    Put(size_t target, Key* k, Value* v) : Message(MsgType::Put, target) {
-        k_ = k->clone();
+    Put(Key* k, Value* v) : Get(k) {
         v_ = v->clone();
+        type_ = MsgType::Put;
     }
 
     ~Put() { delete(v_); }
 
     SerialString* serialize() {
         SerialString* g_ss = Get::serialize();
-        SerialString* v_ss = v_->serialize();
+        SerialString* v_ss = v_->serialized();
 
         size_t size = g_ss->size_ + v_ss->size_;
         char* arr = new char[size];
@@ -217,7 +199,7 @@ public:
         SerialString* g_ss = g->serialize();
 
         SerialString* val_substr = new SerialString(string->data_ + g_ss->size_, string->size_ - g_ss->size_);
-        Value* v = Value::deserialize(val_substr);
+        Value* v = new Value(val_substr);
         delete(val_substr);
         delete(g_ss);
 
@@ -264,10 +246,10 @@ public:
     }
 
     static Status* deserialize(SerialString* string) {
-        Message* m = Message::deserialize(string);
+        Message* m = Message::deserialize_(string);
 
         SerialString* val_substr = new SerialString(string->data_ + (3 * sizeof(size_t)), string->size_ - (3 * sizeof(size_t)));
-        Value* v = Value::deserialize(val_substr);
+        Value* v = new Value(val_substr);
         delete(val_substr);
 
         Status* s = new Status(*m, *v);
@@ -280,12 +262,19 @@ public:
 
 class Directory : public Message {
 public:
-    size_t num_nodes;
+    size_t num_nodes_;
     size_t* ports_; // owned
     String** addresses_; // owned
 
+    Directory(Message& m, size_t num_nodes, size_t* ports, String** addresses) : Message(m) {
+        num_nodes_ = num_nodes;
+        ports_ = ports;
+        addresses_ = addresses;
+    }
+
     // takes ownersip of ports and addresses
     Directory(size_t num_nodes, size_t* ports, String** addresses) : Message(MsgType::Directory, 0) {
+        num_nodes_ = num_nodes;
         ports_ = ports;
         addresses_ = addresses;
     }
@@ -294,9 +283,9 @@ public:
         SerialString* m_ss = Message::serialize();
 
         // serialize addresses
-        SerialString** addresses_ss = new SerialString*[num_nodes];
+        SerialString** addresses_ss = new SerialString*[num_nodes_];
         size_t addresses_size = 0;
-        for (size_t i = 0; i < num_nodes; i++)
+        for (size_t i = 0; i < num_nodes_; i++)
         {
             size_t s = addresses_[i]->size();
             char* str = new char[sizeof(size_t) + s];
@@ -308,7 +297,7 @@ public:
         }
         
 
-        size_t size = m_ss->size_ + sizeof(size_t) + (num_nodes * sizeof(size_t)) + addresses_size;
+        size_t size = m_ss->size_ + sizeof(size_t) + (num_nodes_ * sizeof(size_t)) + addresses_size;
         char* arr = new char[size];
 
         size_t pos = 0;
@@ -316,13 +305,13 @@ public:
         pos += m_ss->size_;
         delete(m_ss);
 
-        memcpy(arr + pos, &num_nodes, sizeof(size_t));
+        memcpy(arr + pos, &num_nodes_, sizeof(size_t));
         pos += sizeof(size_t);
 
-        memcpy(arr + pos, ports_, num_nodes * sizeof(size_t));
-        pos += num_nodes * sizeof(size_t);
+        memcpy(arr + pos, ports_, num_nodes_ * sizeof(size_t));
+        pos += num_nodes_ * sizeof(size_t);
 
-        for (size_t i = 0; i < num_nodes; i++)
+        for (size_t i = 0; i < num_nodes_; i++)
         {
             SerialString* a_ss = addresses_ss[i];
             memcpy(arr + pos, a_ss->data_, a_ss->size_);
@@ -338,6 +327,58 @@ public:
     }
 
     static Directory* deserialize(SerialString* string) {
+        Message* m = Message::deserialize_(string);
+        size_t nodes;
+
+        size_t pos = 3 * sizeof(size_t);
+        memcpy(&nodes, string->data_ + pos, sizeof(size_t));
+        pos += sizeof(size_t);
+
+        size_t* ports = new size_t[nodes];
+        String** addresses = new String*[nodes];
+
+        memcpy(ports, string->data_ + pos, nodes * sizeof(size_t));
+        pos += nodes * sizeof(size_t);
+
+        for (size_t i = 0; i < nodes; i++)
+        {
+            size_t sz;
+            memcpy(&sz, string->data_ + pos, sizeof(size_t));
+            pos += sizeof(size_t);
+
+            char* arr = new char[sz + 1];
+            arr[sz] = '\0';
+
+            memcpy(arr, string->data_ + pos, sz);
+            pos += sz;
+
+            addresses[i] = new String(arr);
+            delete[](arr);
+        }
         
+        Directory* d = new Directory(*m, nodes, ports, addresses);
+
+        delete(m);
+        return d;
     }
 };
+
+static Message* msg_deserialize(SerialString* serial) {
+    size_t type;
+    memcpy(&type, serial->data_, sizeof(size_t));
+    switch(static_cast<MsgType>(type)) {
+        case MsgType::Register:
+            return Register::deserialize(serial);
+        case MsgType::Get:
+            return Get::deserialize(serial);
+        case MsgType::Put:
+            return Put::deserialize(serial);
+        case MsgType::Status:
+            return Status::deserialize(serial);
+        case MsgType::Directory:
+            return Directory::deserialize(serial);
+        default:
+            assert(false);
+            return nullptr;
+    }
+}

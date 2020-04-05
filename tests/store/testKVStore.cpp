@@ -24,25 +24,44 @@ public:
         delete[](message);
     }
 
-    char* serialize() {
-        StrBuff buf;
-        buf.c("TE|");
-        buf.c(to_str<size_t>(number));
-        buf.addc('|');
-        buf.c(to_str<double>(percentage));
-        buf.addc('|');
-        buf.c(message);
-        String* s = buf.get();
-        char* serialized = duplicate(s->c_str());
-        delete(s);
-        return serialized;
+    SerialString* serialize() {
+        size_t m_len = strlen(message);
+        char* arr = new char[sizeof(size_t) + sizeof(double) + m_len];
+        size_t pos = 0;
+
+        memcpy(arr, &number, sizeof(size_t));
+        pos += sizeof(size_t);
+
+        memcpy(arr + pos, &percentage, sizeof(double));
+        pos += sizeof(double);
+
+        memcpy(arr + pos, message, m_len);
+        pos += m_len;
+
+        SerialString* ss = new SerialString(arr, pos);
+        delete[](arr);
+
+        return ss;
     }
 
-    static TestSO* deserialize(char* serialized) {
-        size_t n = atol(strtok(serialized+3, "|"));
-        double p = atof(strtok(NULL, "|"));
-        char* m = strtok(NULL, "|");
-        return new TestSO(n, p, m);
+    static TestSO* deserialize(SerialString* serialized) {
+        size_t n;
+        double p;
+
+        size_t pos = 0;
+
+        memcpy(&n, serialized->data_ + pos, sizeof(size_t));
+        pos += sizeof(size_t);
+
+        memcpy(&p, serialized->data_ + pos, sizeof(double));
+        pos += sizeof(double);
+
+        char* m = new char[serialized->size_ - pos];
+        memcpy(m, serialized->data_ + pos, serialized->size_ - pos);
+
+        TestSO* so = new TestSO(n, p, m);
+        delete[](m);
+        return so;
     }
 };
 
@@ -117,10 +136,10 @@ public:
     }
 
     bool testGetValue() {
-        assert(stringEqual(n1->getValue(k1)->serialized(), v1->serialized()));
-        assert(stringEqual(n1->getValue(k2)->serialized(), v2->serialized()));
+        assert(stringEqual(n1->getValue(k1)->serialized()->data_, v1->serialized()->data_));
+        assert(stringEqual(n1->getValue(k2)->serialized()->data_, v2->serialized()->data_));
         assert(n1->getValue(k3) == nullptr);
-        assert(stringEqual(n3->getValue(k3)->serialized(), v2->serialized()));
+        assert(stringEqual(n3->getValue(k3)->serialized()->data_, v2->serialized()->data_));
 
         OK("KVStore_Node::getValue(k) -- passed.");
         return true;
@@ -133,10 +152,10 @@ public:
         assert(n1->find(k3) != nullptr);
 
         assert(n3->count() == 1);
-        assert(stringEqual(n3->getValue(k3)->serialized(), v2->serialized()));
+        assert(stringEqual(n3->getValue(k3)->serialized()->data_, v2->serialized()->data_));
         n3->set(k3, v1);
         assert(n3->count() == 1);
-        assert(stringEqual(n3->getValue(k3)->serialized(), v1->serialized()));
+        assert(stringEqual(n3->getValue(k3)->serialized()->data_, v1->serialized()->data_));
 
         OK("KVStore_Node::set(k, v) -- passed.");
         return true;
@@ -176,8 +195,8 @@ public:
 
 class TestKVStore : public Test {
 public:
-    KVStore* small = new KVStore(1);
-    KVStore* reg = new KVStore();
+    KVStore* small = new KVStore(0, nullptr, 1);
+    KVStore* reg = new KVStore(0, nullptr);
     TestSO* so = new TestSO(9, -12.3, "testo mbesto");
     Value* v = new Value(so);
 
@@ -240,9 +259,9 @@ public:
     bool testGet() {
         Key k("in_small", 0);
         Key kbad("test", 0);
-        assert(stringEqual(small->get(&k)->serialized(), v->serialized()));
+        assert(stringEqual(small->get(&k)->serialized()->data_, v->serialized()->data_));
         assert(small->get(&kbad) == nullptr);
-        assert(stringEqual(reg->get(&kbad)->serialized(), v->serialized()));
+        assert(stringEqual(reg->get(&kbad)->serialized()->data_, v->serialized()->data_));
 
         OK("KVStore::Get(k) -- passed.");
         return true;
@@ -250,7 +269,7 @@ public:
 
     bool testWaitAndGet() {
         Key k("test", 0);
-        assert(stringEqual(reg->waitAndGet(&k)->serialized(), v->serialized()));
+        assert(stringEqual(reg->waitAndGet(&k)->serialized()->data_, v->serialized()->data_));
 
         WaitAndGetThread* thread = new WaitAndGetThread(small, &k);
 
@@ -261,7 +280,7 @@ public:
 
         thread->join();
 
-        assert(stringEqual(thread->v_->serialized(), v->serialized()));
+        assert(stringEqual(thread->v_->serialized()->data_, v->serialized()->data_));
         assert(thread->time_ >= 1.0);
 
         OK("KVStore::waitAndGet(k) -- passed.");
@@ -272,12 +291,12 @@ public:
         Key k("test2", 0);
         assert(small->get(&k) == nullptr);
         small->put(&k, v);
-        assert(stringEqual(small->get(&k)->serialized(), v->serialized()));
+        assert(stringEqual(small->get(&k)->serialized()->data_, v->serialized()->data_));
 
         TestSO so2(4, 10.5, "my fridge");
         Value v2(&so2);
         small->put(&k, &v2);
-        assert(stringEqual(small->get(&k)->serialized(), v2.serialized()));
+        assert(stringEqual(small->get(&k)->serialized()->data_, v2.serialized()->data_));
 
         OK("KVStore::Put(k, v) -- passed.");
         return true;

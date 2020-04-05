@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include "../utils/object.h"
+#include "../utils/serial.h"
 
 /**
  * A simple Key class used for associating and accessing objects within a KV store.

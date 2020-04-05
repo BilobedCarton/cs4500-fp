@@ -138,6 +138,33 @@ public:
     }
 };
 
+class KVStore; // forward dec
+
+class NetworkListener : public Thread {
+public:
+    Lock lock_;
+    KVStore* store_; // external
+    Status* s_; // owned
+
+    NetworkListener(KVStore* store) {
+        store_ = store;
+        s_ = nullptr;
+    }
+
+    ~NetworkListener() { if(s_ != nullptr) delete(s_); }
+
+    Status* await_status() {
+        while(s_ == nullptr) lock_.wait(); // wait until s_ available
+        Status* s = s_;
+        s_ = nullptr;
+        lock_.unlock();
+        lock_.notify_all(); // s_ consumed
+        return s;
+    }
+
+    void run();
+};
+
 /**
  * @brief A Key Value Store where keys are a string and values are a serialized object in string form
  * 
@@ -167,7 +194,7 @@ public:
             nodes_[i] = nullptr;
         }
 
-        listener_->start();
+        listener_.start();
     }
 
     /**
@@ -279,13 +306,13 @@ public:
      */
     Value* waitAndGet(Key* k) {
         Value* v;
-        if(k->idx_ == idx) {
+        if(k->idx_ == idx_) {
             while(get(k) == nullptr) { sleep(1); } // TODO: pick actual sleeping time
             v = get(k);
         }
         else { // send a request on the network
             network_->send_message(new Get(k));
-            Status* s = listener_->await_status();
+            Status* s = listener_.await_status();
             v = s->v_->clone();
             delete(s);
         }
@@ -300,7 +327,7 @@ public:
      * @return KVStore* - this
      */
     KVStore* put(Key* k, Value* v) {
-        lock_.lock()
+        lock_.lock();
         grow();
         size_t pos = get_position(k);
         if(nodes_[pos] == nullptr) nodes_[pos] = new KVStore_Node(k, v);
@@ -310,56 +337,33 @@ public:
     }
 };
 
-class NetworkListener : public Thread {
-public:
-    Lock lock_;
-    KVStore* store_; // external
-    Status* s_; // owned
-
-    NetworkListener(KVStore* store) {
-        store_ = store;
-        s_ = nullptr;
-    }
-
-    ~NetworkListener() { if(s_ != nullptr) delete(s_); }
-
-    Status* await_status() {
-        while(s_ == nullptr) lock_.wait(); // wait until s_ available
-        Status* s = s_;
-        s_ = nullptr;
-        lock_.unlock();
-        lock_.notify_all(); // s_ consumed
-        return s;
-    }
-
-    void run() {
-        while(store_ != nullptr) { // go forever
-            Message* m = store_->network_->receive_message();
-            switch(m->type_) {
-                case MsgType::Register:
-                    break; // ignore
-                case MsgType::Get:
-                    Get* g = dynamic_cast<Get *>(m);
-                    store_->network_->send_message(new Status(g->sender_, store_->waitAndGet(g->k_)));
-                    delete(g);
-                    break;
-                case MsgType::Put:
-                    Put* p = dynamic_cast<Put *>(m);
-                    store_->put(p->k_, p->v_);
-                    delete(p);
-                    break;
-                case MsgType::Status:
-                    if(s_ != nullptr) lock_.wait(); // Wait until s_ consumed
-                    s_ = dynamic_cast<Status *>(m);
-                    lock_.unlock();
-                    lock_.notify_all(); // s_ available
-                    break;
-                case MsgType::Directory:
-                    break; // ignore
-                default:
-                    assert(false);
-                    return;
-            }
+void NetworkListener::run() {
+    while(store_ != nullptr) { // go forever
+        Message* m = store_->network_->receive_message();
+        Get* g = dynamic_cast<Get *>(m);
+        Put* p = dynamic_cast<Put *>(m);
+        switch(m->type_) {
+            case MsgType::Register:
+                break; // ignore
+            case MsgType::Get:
+                store_->network_->send_message(new Status(g->sender_, store_->waitAndGet(g->k_)));
+                delete(g);
+                break;
+            case MsgType::Put:
+                store_->put(p->k_, p->v_);
+                delete(p);
+                break;
+            case MsgType::Status:
+                if(s_ != nullptr) lock_.wait(); // Wait until s_ consumed
+                s_ = dynamic_cast<Status *>(m);
+                lock_.unlock();
+                lock_.notify_all(); // s_ available
+                break;
+            case MsgType::Directory:
+                break; // ignore
+            default:
+                assert(false);
+                break;
         }
     }
-};
+}

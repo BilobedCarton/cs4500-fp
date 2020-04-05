@@ -39,7 +39,7 @@ public:
 class MsgQueArr : public Array {
 public:
     MsgQueArr(size_t cap) : Array(cap) {}
-    MsgQue* get(size_t idx) { return dynamic_cast<MsgQue*>(get(idx)); }
+    MsgQue* get(size_t idx) { return dynamic_cast<MsgQue*>(Array::get(idx)); }
 };
 
 class StringSize_tMap : public Map {
@@ -116,7 +116,7 @@ public:
     NodeInfo* nodes_; // all nodes
     size_t this_node_; // our index
     int sock_; // our socket
-    sockaddr_in ip_ // our ip
+    sockaddr_in ip_; // our ip
 
     ~NetworkIP() { close(sock_); }
 
@@ -131,7 +131,7 @@ public:
             nodes_[i].id = 0;
         }
         nodes_[0].address = ip_;
-        nodes[0].id = 0;
+        nodes_[0].id = 0;
         for (size_t i = 2; i < num_nodes; i++)
         {
             Register* msg = dynamic_cast<Register*>(receive_message());
@@ -147,7 +147,7 @@ public:
             ports[i] = ntohs(nodes_[i + 1].address.sin_port);
             addresses[i] = new String(inet_ntoa(nodes_[i + 1].address.sin_addr));
         }
-        Directory ipd(ports, addresses);
+        Directory ipd(num_nodes - 1, ports, addresses);
         for (size_t i = 0; i < num_nodes; i++)
         {
             ipd.target_ = i;
@@ -166,21 +166,24 @@ public:
         
         char* ip_arr = new char[INET_ADDRSTRLEN + 1];
         ip_arr[INET_ADDRSTRLEN] = '\0';
-        inet_ntop(AF_INET, &ip_.sin_addr, ip_arr, INET_ADDRSTRLEN)
+        inet_ntop(AF_INET, &ip_.sin_addr, ip_arr, INET_ADDRSTRLEN);
         String* ip = new String(ip_arr);
 
-        Register msg(ip, port);
+        Register msg(*ip, port);
         send_message(&msg);
 
         Directory* ipd = dynamic_cast<Directory*>(receive_message());
         NodeInfo* nodes = new NodeInfo[num_nodes];
         nodes[0] = nodes_[0];
-        for (size_t ipd = 0; ipd < clients; ipd++)
+        for (size_t i = 0; i < ipd->num_nodes_; i++)
         {
             nodes[i + 1].id = i + 1;
             nodes[i + 1].address.sin_family = AF_INET;
-            nodes[i + 1].address.sin_port = htons(ipd->ports[i]);
-            if(inet_pton(AF_INET, ipd->addresses[i]->c_str(), &nodes[i + 1].address.sin_addr) <= 0) assert(false && ("Invalid IP directory-addr. for node" << (i + 1)));
+            nodes[i + 1].address.sin_port = htons(ipd->ports_[i]);
+            if(inet_pton(AF_INET, ipd->addresses_[i]->c_str(), &nodes[i + 1].address.sin_addr) <= 0) {
+                p("Invalid IP directory-addr. for node ").pln(i + 1);
+                assert(false);
+            }
         }
         delete[](nodes_);
         nodes_ = nodes;
@@ -221,10 +224,10 @@ public:
         while(rd != size) rd += read(req, buf, size - rd);
         SerialString* ss = new SerialString(buf, size);
         delete[](buf);
-        Message* msg = Message::deserialize(ss);
+        Message* msg = msg_deserialize(ss);
         delete(ss);
 
         return msg;
     }
-}
+};
 
