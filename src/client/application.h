@@ -6,15 +6,12 @@
 #include "../store/kvstore.h"
 #include "../utils/thread.h"
 
-
-static KVStore kv;
-
 class Application : public Object {
 public:
-
+    KVStore kv;
     size_t idx_;
 
-    Application(size_t idx) {
+    Application(size_t idx, NetworkIfc* net) : kv(idx, net) {
         idx_ = idx;
     }
 
@@ -34,6 +31,7 @@ public:
   }
 
   void run() {
+    node->kv.network_->register_node(node->idx_);
     node->run_();
   }
 };

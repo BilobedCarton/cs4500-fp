@@ -29,11 +29,23 @@ public:
 
     Message* pop() {
         lock_.lock();
-        if(arr_->count() == 0) return nullptr; 
-        Message* m = dynamic_cast<Message *>(arr_->pop(arr_->count() - 1)); 
+        Message* m;
+        if(arr_->count() == 0) m = nullptr; 
+        else m = dynamic_cast<Message *>(arr_->pop(arr_->count() - 1)); 
         lock_.unlock();
         return m;
     }
+};
+
+class Size_t : public Object {
+public:
+    size_t value_;
+
+    Size_t(size_t value) {
+        value_ = value;
+    }
+
+    Object* clone() { return this; }
 };
 
 class MsgQueArr : public Array {
@@ -48,13 +60,13 @@ public:
 
     void put(String* k, size_t v) {
         lock_.lock();
-        Map::put(k, (Object*)v);
+        Map::put(k, new Size_t(v));
         lock_.unlock();
     }
 
     size_t get(String* k) {
         lock_.lock();
-        size_t t = (size_t)Map::get(k);
+        size_t t = dynamic_cast<Size_t*>(Map::get(k))->value_;
         lock_.unlock();
         return t;
     }
@@ -63,13 +75,13 @@ public:
 class NetworkIfc : public Object {
 public:
 
-    virtual void register_node(size_t idx);
+    virtual void register_node(size_t idx) { return; }
 
     virtual size_t index() { assert(false); }
 
-    virtual void send_message(Message* msg);
+    virtual void send_message(Message* msg) = 0;
 
-    virtual Message* receive_message();
+    virtual Message* receive_message() = 0;
 };
 
 class PseudoNetwork : public NetworkIfc {

@@ -50,7 +50,7 @@ class Key : public SerializableObject {
     bool equals(Object* other) {
         Key* cast = dynamic_cast<Key *>(other);
         if(cast == nullptr) return false;
-        return strcmp(name_, cast->name_) == 0;
+        return strcmp(name_, cast->name_) == 0 && idx_ == cast->idx_;
     }
 
     // inherited from object

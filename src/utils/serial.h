@@ -28,6 +28,11 @@ public:
 	SerialString* clone() {
 		return new SerialString(data_, size_);
 	}
+
+	bool equals(SerialString* other) {
+		if(size_ != other->size_) return false;
+		return memcmp(data_, other->data_, size_) == 0;
+	}
 };
 
 class Serializable {

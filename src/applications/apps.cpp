@@ -1,9 +1,11 @@
 #include "demo.h"
 
 int main() {
-    Demo prod(0);
-    Demo count(1);
-    Demo sum(2);
+    PseudoNetwork* net = new PseudoNetwork(3);
+
+    Demo prod(0, net);
+    Demo count(1, net);
+    Demo sum(2, net);
 
     // prod.run_();
     // count.run_();

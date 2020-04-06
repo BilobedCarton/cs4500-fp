@@ -22,24 +22,29 @@ unit-tests: build-tests run-tests clean-tests
 
 build-tests:
 	cd ./tests; g++ -o testKey -Wall -std=c++17 ./store/testKey.cpp
-	cd ./tests; g++ -o testKVStore -Wall -std=c++17 ./store/testKVStore.cpp
 	cd ./tests; g++ -o testValue -Wall -std=c++17 ./store/testValue.cpp
+	cd ./tests; g++ -o testMessage -Wall -std=c++17 ./store/testMessage.cpp
+	cd ./tests; g++ -o testNetwork -Wall -std=c++17 ./store/testNetwork.cpp
+	cd ./tests; g++ -o testKVStore -Wall -std=c++17 ./store/testKVStore.cpp
 	cd ./tests; g++ -o testSchema -Wall -std=c++17 ./dataframe/testSchema.cpp
 	cd ./tests; g++ -o testRow -Wall -std=c++17 ./dataframe/testRow.cpp
 	cd ./tests; g++ -o testColumn -Wall -std=c++17 ./dataframe/testColumn.cpp
 	cd ./tests; g++ -o testDataframe -Wall -std=c++17 ./dataframe/testDataframe.cpp
+	cd ./tests; g++ -o testMessage -Wall -std=c++17 ./store/testMessage.cpp
 
 run-tests:
 	-./tests/testKey; echo
-	-./tests/testKVStore; echo
 	-./tests/testValue; echo
+	-./tests/testMessage; echo
+	-./tests/testNetwork; echo
+	-./tests/testKVStore; echo
 	-./tests/testSchema; echo
 	-./tests/testRow; echo
 	-./tests/testColumn; echo
 	-./tests/testDataframe; echo
 
 clean-tests:
-	-cd ./tests; rm testKey testKVStore testValue testSchema testRow testColumn testDataframe
+	-cd ./tests; rm testMessage testNetwork testKey testKVStore testValue testSchema testRow testColumn testDataframe
 
 clean:
 	-rm -r main *.dSYM

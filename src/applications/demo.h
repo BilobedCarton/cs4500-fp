@@ -10,7 +10,7 @@ public:
   Key* verify = new Key("verif", 0);
   Key* check = new Key("ck", 0);
  
-  Demo(size_t idx): Application(idx) {}
+  Demo(size_t idx, NetworkIfc* net): Application(idx, net) {}
  
   void run_() override {
     switch(this_node()) {

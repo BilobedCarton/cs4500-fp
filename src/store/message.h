@@ -56,6 +56,12 @@ public:
         m->sender_ = sender;
         return m;
     }
+
+    bool equals(Object* other) {
+        Message* cast = dynamic_cast<Message *>(other);
+        if(cast == nullptr) return false;
+        return (type_ == cast->type_ && target_ == cast->target_ && sender_ == cast->sender_);
+    }
 };
 
 class Register : public Message {
@@ -111,6 +117,15 @@ public:
         delete(m);
         return r;
     }
+
+    bool equals(Object* other) {
+        if(!Message::equals(other)) return false;
+        Register* cast = dynamic_cast<Register *>(other);
+        if(cast == nullptr) return false;
+        return (client.sin_addr.s_addr == cast->client.sin_addr.s_addr 
+             && client.sin_port == cast->client.sin_port
+             && port == cast->port);
+    }
 };
 
 class Get : public Message {
@@ -134,7 +149,7 @@ public:
         size_t size = m_ss->size_ + k_ss->size_;
         char* arr = new char[size];
         memcpy(arr, m_ss->data_, m_ss->size_);
-        memcpy(arr, k_ss->data_, k_ss->size_);
+        memcpy(arr + m_ss->size_, k_ss->data_, k_ss->size_);
 
         delete(m_ss);
         delete(k_ss);
@@ -158,6 +173,13 @@ public:
         delete(k);
         return g;
     }
+
+    bool equals(Object* other) {
+        if(!Message::equals(other)) return false;
+        Get* cast = dynamic_cast<Get *>(other);
+        if(cast == nullptr) return false;
+        return k_->equals(cast->k_);
+    }
 };
 
 class Put : public Get {
@@ -178,7 +200,7 @@ public:
 
     SerialString* serialize() {
         SerialString* g_ss = Get::serialize();
-        SerialString* v_ss = v_->serialized();
+        SerialString* v_ss = v_->serialized()->clone();
 
         size_t size = g_ss->size_ + v_ss->size_;
         char* arr = new char[size];
@@ -209,6 +231,13 @@ public:
         delete(v);
         return p;
     }
+
+    bool equals(Object* other) {
+        if(!Get::equals(other)) return false;
+        Put* cast = dynamic_cast<Put *>(other);
+        if(cast == nullptr) return false;
+        return v_->equals(cast->v_);
+    }
 };
 
 class Status : public Message {
@@ -229,7 +258,7 @@ public:
 
     SerialString* serialize() {
         SerialString* m_ss = Message::serialize();
-        SerialString* v_ss = v_->serialized();
+        SerialString* v_ss = v_->serialized()->clone();
 
         size_t size = m_ss->size_ + v_ss->size_;
         char* arr = new char[size];
@@ -257,6 +286,13 @@ public:
         delete(m);
         delete(v);
         return s;
+    }
+
+    bool equals(Object* other) {
+        if(!Message::equals(other)) return false;
+        Status* cast = dynamic_cast<Status *>(other);
+        if(cast == nullptr) return false;
+        return v_->equals(cast->v_);
     }
 };
 
@@ -360,6 +396,19 @@ public:
 
         delete(m);
         return d;
+    }
+
+    bool equals(Object* other) {
+        if(!Message::equals(other)) return false;
+        Directory* cast = dynamic_cast<Directory *>(other);
+        if(cast == nullptr) return false;
+        if(num_nodes_ != cast->num_nodes_) return false;
+        for (size_t i = 0; i < num_nodes_; i++)
+        {
+            if(ports_[i] != cast->ports_[i]) return false;
+            if(!addresses_[i]->equals(cast->addresses_[i])) return false;
+        }
+        return true;
     }
 };
 

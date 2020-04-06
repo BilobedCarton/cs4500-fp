@@ -11,6 +11,7 @@ public:
     Node(Object* k, Object* v) {
         k_ = k->clone();
         v_ = v->clone();
+        next_ = nullptr;
     }
 
     Node(Object* k, Object* v, Node* next) : Node(k, v) {

@@ -136,10 +136,10 @@ public:
     }
 
     bool testGetValue() {
-        assert(stringEqual(n1->getValue(k1)->serialized()->data_, v1->serialized()->data_));
-        assert(stringEqual(n1->getValue(k2)->serialized()->data_, v2->serialized()->data_));
+        assert(n1->getValue(k1)->serialized()->equals(v1->serialized()));
+        assert(n1->getValue(k2)->serialized()->equals(v2->serialized()));
         assert(n1->getValue(k3) == nullptr);
-        assert(stringEqual(n3->getValue(k3)->serialized()->data_, v2->serialized()->data_));
+        assert(n3->getValue(k3)->serialized()->equals(v2->serialized()));
 
         OK("KVStore_Node::getValue(k) -- passed.");
         return true;
@@ -152,10 +152,10 @@ public:
         assert(n1->find(k3) != nullptr);
 
         assert(n3->count() == 1);
-        assert(stringEqual(n3->getValue(k3)->serialized()->data_, v2->serialized()->data_));
+        assert(n3->getValue(k3)->serialized()->equals(v2->serialized()));
         n3->set(k3, v1);
         assert(n3->count() == 1);
-        assert(stringEqual(n3->getValue(k3)->serialized()->data_, v1->serialized()->data_));
+        assert(n3->getValue(k3)->serialized()->equals(v1->serialized()));
 
         OK("KVStore_Node::set(k, v) -- passed.");
         return true;
@@ -193,16 +193,18 @@ public:
     }
 };
 
-class TestKVStore : public Test {
+class TestLocalKVStore : public Test {
 public:
-    KVStore* small = new KVStore(0, nullptr, 1);
-    KVStore* reg = new KVStore(0, nullptr);
+    PseudoNetwork* net = new PseudoNetwork(2);
+    KVStore* small = new KVStore(0, net, 1);
+    KVStore* reg = new KVStore(1, net);
     TestSO* so = new TestSO(9, -12.3, "testo mbesto");
     Value* v = new Value(so);
 
-    ~TestKVStore() {
+    ~TestLocalKVStore() {
         delete(small);
         delete(reg);
+        delete(net);
 
         delete(so);
         delete(v);
@@ -211,7 +213,7 @@ public:
     bool testCount() {
         assert(small->count() == 0);
         assert(reg->count() == 0);
-        Key k("test", 0);
+        Key k("test", 1);
         assert(reg->put(&k, v) == reg);
         assert(reg->count() == 1);
         Key k2("tset", 1);
@@ -232,7 +234,7 @@ public:
     }
 
     bool testPutNode() {
-        Key k("node", 0);
+        Key k("node", 1);
         KVStore_Node* n = new KVStore_Node(&k, v);
         assert(reg->count() == 2);
         reg->put_node(n);
@@ -259,28 +261,30 @@ public:
     bool testGet() {
         Key k("in_small", 0);
         Key kbad("test", 0);
-        assert(stringEqual(small->get(&k)->serialized()->data_, v->serialized()->data_));
-        assert(small->get(&kbad) == nullptr);
-        assert(stringEqual(reg->get(&kbad)->serialized()->data_, v->serialized()->data_));
+        Key kreg("test", 1);
+        assert(small->get(&k)->serialized()->equals(v->serialized()));
+        //assert(small->get(&kbad) == nullptr);
+        assert(reg->get(&kreg)->serialized()->equals(v->serialized()));
 
-        OK("KVStore::Get(k) -- passed.");
+        OK("KVStore::get(k) -- passed.");
         return true;
     }
 
     bool testWaitAndGet() {
-        Key k("test", 0);
-        assert(stringEqual(reg->waitAndGet(&k)->serialized()->data_, v->serialized()->data_));
+        Key k("test", 1);
+        assert(reg->waitAndGet(&k)->serialized()->equals(v->serialized()));
 
-        WaitAndGetThread* thread = new WaitAndGetThread(small, &k);
+        Key k2("test", 0);
+        WaitAndGetThread* thread = new WaitAndGetThread(small, &k2);
 
         thread->start();
 
         sleep(1);
-        small->put(&k, v);
+        small->put(&k2, v);
 
         thread->join();
 
-        assert(stringEqual(thread->v_->serialized()->data_, v->serialized()->data_));
+        assert(thread->v_->serialized()->equals(v->serialized()));
         assert(thread->time_ >= 1.0);
 
         OK("KVStore::waitAndGet(k) -- passed.");
@@ -291,14 +295,14 @@ public:
         Key k("test2", 0);
         assert(small->get(&k) == nullptr);
         small->put(&k, v);
-        assert(stringEqual(small->get(&k)->serialized()->data_, v->serialized()->data_));
+        assert(small->get(&k)->serialized()->equals(v->serialized()));
 
         TestSO so2(4, 10.5, "my fridge");
         Value v2(&so2);
         small->put(&k, &v2);
-        assert(stringEqual(small->get(&k)->serialized()->data_, v2.serialized()->data_));
+        assert(small->get(&k)->serialized()->equals(v2.serialized()));
 
-        OK("KVStore::Put(k, v) -- passed.");
+        OK("KVStore::put(k, v) -- passed.");
         return true;
     }
 
@@ -315,7 +319,7 @@ public:
 
 int main() {
     TestKVStoreNode testNode;
-    TestKVStore test;
+    TestLocalKVStore testLocal;
     testNode.testSuccess();
-    test.testSuccess();
+    testLocal.testSuccess();
 }

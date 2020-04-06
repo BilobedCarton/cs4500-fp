@@ -70,6 +70,10 @@ public:
         v->serialized_ = serialized()->clone();
         return v;
     }
+
+    virtual bool equals(Value* other) {
+        return serialized()->equals(other->serialized());
+    }
 };
 
 /**

@@ -142,7 +142,8 @@ class KVStore; // forward dec
 
 class NetworkListener : public Thread {
 public:
-    Lock lock_;
+    Lock prod_;
+    Lock cons_;
     KVStore* store_; // external
     Status* s_; // owned
 
@@ -154,11 +155,12 @@ public:
     ~NetworkListener() { if(s_ != nullptr) delete(s_); }
 
     Status* await_status() {
-        while(s_ == nullptr) lock_.wait(); // wait until s_ available
+        //prod_.notify_all(); // let producer know we need a status
+        if(s_ == nullptr) { prod_.notify_all(); cons_.wait(); } // wait until s_ available
         Status* s = s_;
         s_ = nullptr;
-        lock_.unlock();
-        lock_.notify_all(); // s_ consumed
+        cons_.unlock();
+        prod_.notify_all();
         return s;
     }
 
@@ -172,7 +174,8 @@ public:
 class KVStore : public Object {
 public:
     size_t idx_;
-    Lock lock_;
+    Lock prod_;
+    Lock cons_;
     NetworkIfc* network_; // unowned
     NetworkListener listener_;
     KVStore_Node** nodes_; // owned, elements owned
@@ -291,10 +294,11 @@ public:
     Value* get(Key* k) {
         if(k->idx_ != idx_) return waitAndGet(k);
 
-        lock_.lock();
-        if(nodes_[get_position(k)] == nullptr) return nullptr;
-        Value* v = nodes_[get_position(k)]->getValue(k);
-        lock_.unlock();
+        Value* v;
+        prod_.lock();
+        if(nodes_[get_position(k)] == nullptr) v = nullptr;
+        else v = nodes_[get_position(k)]->getValue(k);
+        prod_.unlock();
         return v;
     }
 
@@ -307,8 +311,9 @@ public:
     Value* waitAndGet(Key* k) {
         Value* v;
         if(k->idx_ == idx_) {
-            while(get(k) == nullptr) { sleep(1); } // TODO: pick actual sleeping time
             v = get(k);
+            while(v == nullptr) { cons_.unlock(); cons_.wait(); v = get(k); } // TODO: pick actual sleeping time
+            cons_.unlock();
         }
         else { // send a request on the network
             network_->send_message(new Get(k));
@@ -327,21 +332,27 @@ public:
      * @return KVStore* - this
      */
     KVStore* put(Key* k, Value* v) {
-        lock_.lock();
-        grow();
-        size_t pos = get_position(k);
-        if(nodes_[pos] == nullptr) nodes_[pos] = new KVStore_Node(k, v);
-        else nodes_[pos]->set(k, v);
-        lock_.unlock();
+        if(k->idx_ != idx_) network_->send_message(new Put(k, v));
+        else {
+            prod_.lock();
+            grow();
+            size_t pos = get_position(k);
+            if(nodes_[pos] == nullptr) nodes_[pos] = new KVStore_Node(k, v);
+            else nodes_[pos]->set(k, v);
+            prod_.unlock();
+            cons_.notify_all();
+        }
         return this;
     }
 };
 
 void NetworkListener::run() {
+    store_->network_->register_node(store_->idx_);
     while(store_ != nullptr) { // go forever
         Message* m = store_->network_->receive_message();
         Get* g = dynamic_cast<Get *>(m);
         Put* p = dynamic_cast<Put *>(m);
+        if(m == nullptr) continue;
         switch(m->type_) {
             case MsgType::Register:
                 break; // ignore
@@ -354,10 +365,10 @@ void NetworkListener::run() {
                 delete(p);
                 break;
             case MsgType::Status:
-                if(s_ != nullptr) lock_.wait(); // Wait until s_ consumed
+                if(s_ != nullptr) { cons_.notify_all(); prod_.wait(); }// Wait until s_ consumed
                 s_ = dynamic_cast<Status *>(m);
-                lock_.unlock();
-                lock_.notify_all(); // s_ available
+                prod_.unlock();
+                cons_.notify_all(); // s_ available
                 break;
             case MsgType::Directory:
                 break; // ignore
