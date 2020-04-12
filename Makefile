@@ -22,6 +22,7 @@ unit-tests: build-tests run-tests clean-tests
 
 build-tests:
 	cd ./tests; g++ -o testArray -Wall -std=c++17 ./utils/testArray.cpp
+	cd ./tests; g++ -o testMap -Wall -std=c++17 ./utils/testMap.cpp
 	cd ./tests; g++ -o testKey -Wall -std=c++17 ./store/testKey.cpp
 	cd ./tests; g++ -o testValue -Wall -std=c++17 ./store/testValue.cpp
 	cd ./tests; g++ -o testMessage -Wall -std=c++17 ./store/testMessage.cpp
@@ -35,6 +36,7 @@ build-tests:
 
 run-tests:
 	-./tests/testArray; echo
+	-./tests/testMap; echo
 	-./tests/testKey; echo
 	-./tests/testValue; echo
 	-./tests/testMessage; echo
@@ -46,7 +48,7 @@ run-tests:
 	-./tests/testDataframe; echo
 
 clean-tests:
-	-cd ./tests; rm testArray testMessage testNetwork testKey testKVStore testValue testSchema testRow testColumn testDataframe
+	-cd ./tests; rm testMap testArray testMessage testNetwork testKey testKVStore testValue testSchema testRow testColumn testDataframe
 
 clean:
 	-rm -r main *.dSYM

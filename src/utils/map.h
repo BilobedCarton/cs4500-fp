@@ -245,9 +245,4 @@ public:
         else nodes_[pos]->set(k, v);
         return this;
     }
-
-    // TODO: actually clone the map
-    Object* clone() {
-        return this;
-    }
 };
