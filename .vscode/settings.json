@@ -66,6 +66,8 @@
         "utility": "cpp",
         "xiosbase": "cpp",
         "xlocale": "cpp",
-        "xstring": "cpp"
+        "xstring": "cpp",
+        "__functional_03": "cpp",
+        "memory_resource": "cpp"
     }
 }

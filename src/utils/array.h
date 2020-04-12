@@ -6,8 +6,6 @@
 #include <assert.h>
 
 #include "object.h"
-#include "string.h"
-#include "serial.h"
 #include "helper.h"
 
 // String extends Object so Array supports String
@@ -107,50 +105,6 @@ public:
         return this;
     }
 
-    // Return index of object in this or -1 if the object is not contained
-    int index(Object* obj)  {
-        for (int i = 0; i < size_; ++i)
-        {   
-            if(list_[i] != nullptr) {
-                if(list_[i]->equals(obj)) return i;
-            } else if(obj == nullptr) return i;
-        }
-        return -1;
-    }
-
-    // Returns true if this contains object else false
-    bool contains(Object* obj) {
-        return index(obj) != -1;
-    }
-
-    // Appends a copy of all items of the other array to this and returns this
-    Array* extend(const Array* arr) {
-        for (int i = 0; i < arr->size_; ++i)
-        {
-            this->append(arr->list_[i]);
-        }
-        return this;
-    }
-
-    // Insert a copy of the object at the index if index from [0, this->count()] and return this
-    Array* insert(size_t idx, Object* obj) {
-        if(idx > size_) return this;
-        append(obj);
-        for (int i = size_ - 1; i > idx; --i)
-        {
-            Object* temp = list_[i - 1];
-            list_[i - 1] = list_[i];
-            list_[i] = temp;
-        }
-        return this;
-    }
-
-    Array* set(size_t idx, Object* obj) {
-        if(idx >= size_) return this;
-        list_[idx] = obj;
-        return this;
-    }
-
     // Return and remove object at the index or return null
     Object* pop(size_t idx) {
         if(idx >= size_) return NULL;
@@ -164,37 +118,5 @@ public:
         size_--;
         list_[size_] = NULL;
         return obj;
-    }
-
-    // Removes first occurance of object from this if this contains it and
-    // return this
-    Array* remove(Object* obj) {
-        int idx = index(obj);
-        if(idx == -1) return this;
-        delete(pop(idx));
-        return this;
-    }
-
-    // Inplace reverse of this and return this
-    Array* reverse() {
-        Object** new_list = new Object*[capacity_];
-        for (int i = 0; i < size_; ++i)
-        {
-            new_list[size_ - i - 1] = list_[i];
-        }
-        delete[](list_);
-        list_ = new_list;
-        return this;
-    }
-
-    // Delete contents of this
-    void clear() {
-        for (int i = 0; i < size_; ++i)
-        {
-            delete(list_[i]);
-        }
-        delete[](list_);
-        size_ = 0;
-        list_ = new Object*[capacity_];
     }
 };
