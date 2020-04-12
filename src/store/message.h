@@ -485,8 +485,8 @@ public:
                 s.p("Directory");
                 break;
             case MsgType::Fail:
-                s.p("Fail for key ").p(dynamic_cast<Get *>(m)->k_->name_)
-                 .p(" in node ").p(dynamic_cast<Get *>(m)->k_->idx_);
+                s.p("Fail for key ").p(dynamic_cast<Fail *>(m)->k_->name_)
+                 .p(" in node ").p(dynamic_cast<Fail *>(m)->k_->idx_);
                 break;
             default:
                 assert(false);

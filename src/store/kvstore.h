@@ -142,12 +142,14 @@ class KVStore; // forward dec
 
 class NetworkListener : public Thread {
 public:
+    size_t fail_count_;
     Lock prod_;
     Lock cons_;
     KVStore* store_; // external
     Status* s_; // owned
 
     NetworkListener(KVStore* store) {
+        fail_count_ = 0;
         store_ = store;
         s_ = nullptr;
     }
@@ -157,6 +159,7 @@ public:
     Status* await_status() {
         //prod_.notify_all(); // let producer know we need a status
         if(s_ == nullptr) { prod_.notify_all(); cons_.wait(); } // wait until s_ available
+        fail_count_ = 0;
         Status* s = s_;
         s_ = nullptr;
         cons_.unlock();
@@ -383,7 +386,7 @@ void NetworkListener::run() {
                 break; // ignore
             case MsgType::Get:
                 handleGet(g);
-                delete(g);
+                //delete(g);
                 break;
             case MsgType::Put:
                 store_->put(p->k_, p->v_);
@@ -399,7 +402,8 @@ void NetworkListener::run() {
                 break; // ignore
             case MsgType::Fail:
                 // wait, and then resend the get
-                sleep(1);
+                fail_count_ += 1;
+                sleep(fail_count_);
                 send = new Get(f->k_);
                 send->sender_ = store_->idx_;
                 store_->network_->send_message(send);
