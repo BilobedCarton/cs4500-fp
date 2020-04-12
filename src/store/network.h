@@ -267,14 +267,14 @@ public:
         if(read(req, &size, sizeof(size_t)) == 0) assert(false && "Failed to read");
         char* buf = new char[size];
         int rd = 0;
-        while(rd != size) rd += read(req, buf, size - rd);
+        while(rd != size) rd += read(req, buf + rd, size - rd);
         SerialString* ss = new SerialString(buf, size);
         delete[](buf);
         Message* msg = msg_deserialize(ss);
         if(msg == nullptr) return nullptr;
-        delete(ss);
 
         Logger::log_receive(msg);
+        delete(ss);
         return msg;
     }
 };
