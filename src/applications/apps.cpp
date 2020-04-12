@@ -3,17 +3,17 @@
 int main() {
     PseudoNetwork* net = new PseudoNetwork(3);
 
-    Demo prod(0, net);
-    Demo count(1, net);
-    Demo sum(2, net);
+    Demo* prod = new Demo(0, net);
+    Demo* count = new Demo(1, net);
+    Demo* sum = new Demo(2, net);
 
     // prod.run_();
     // count.run_();
     // sum.run_();
 
-    NodeThread prodThread(&prod);
-    NodeThread countThread(&count);
-    NodeThread sumThread(&sum);
+    NodeThread prodThread(prod);
+    NodeThread countThread(count);
+    NodeThread sumThread(sum);
 
     Sys s;
 

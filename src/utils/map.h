@@ -4,8 +4,8 @@
 
 class Node {
 public:
-    Object* k_;
-    Object* v_;
+    Object* k_; // owned
+    Object* v_; // owned
     Node * next_;
 
     Node(Object* k, Object* v) {
@@ -200,6 +200,10 @@ public:
         capacity_ *= GROWTH_FACTOR; 
         Node** old = nodes_;
         nodes_ = new Node*[capacity_];
+        for (size_t i = 0; i < capacity_; i++)
+        {
+            nodes_[i] = nullptr;
+        }
 
         // reinsert each node to its new proper location
         for (size_t i = 0; i < capacity_ / GROWTH_FACTOR; i++)

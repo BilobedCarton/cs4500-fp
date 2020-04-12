@@ -164,6 +164,8 @@ public:
         return s;
     }
 
+    void handleGet(Get* g);
+
     void run();
 };
 
@@ -268,6 +270,11 @@ public:
         capacity_ *= GROWTH_FACTOR; 
         KVStore_Node** old = nodes_;
         nodes_ = new KVStore_Node*[capacity_];
+        for (size_t i = 0; i < capacity_; i++)
+        {
+            nodes_[i] = nullptr;
+        }
+        
 
         // reinsert each node to its new proper location
         for (size_t i = 0; i < capacity_ / GROWTH_FACTOR; i++)
@@ -316,7 +323,9 @@ public:
             cons_.unlock();
         }
         else { // send a request on the network
-            network_->send_message(new Get(k));
+            Get* g = new Get(k);
+            g->sender_ = idx_;
+            network_->send_message(g);
             Status* s = listener_.await_status();
             v = s->v_->clone();
             delete(s);
@@ -332,7 +341,11 @@ public:
      * @return KVStore* - this
      */
     KVStore* put(Key* k, Value* v) {
-        if(k->idx_ != idx_) network_->send_message(new Put(k, v));
+        if(k->idx_ != idx_) {
+            Put* p = new Put(k, v);
+            p->sender_ = idx_;
+            network_->send_message(p);
+        }
         else {
             prod_.lock();
             grow();
@@ -346,18 +359,30 @@ public:
     }
 };
 
+void NetworkListener::handleGet(Get* g)  {
+    Value* v = store_->get(g->k_);
+    Message* m;
+    if(v == nullptr) m = new Fail(g->k_);
+    else m = new Status(g->sender_, v);
+    m->sender_ = store_->idx_;
+    m->target_ = g->sender_;
+    store_->network_->send_message(m);
+}
+
 void NetworkListener::run() {
-    store_->network_->register_node(store_->idx_);
+    if(dynamic_cast<PseudoNetwork *>(store_) != nullptr) store_->network_->register_node(store_->idx_);
     while(store_ != nullptr) { // go forever
+        Message* send;
         Message* m = store_->network_->receive_message();
         Get* g = dynamic_cast<Get *>(m);
         Put* p = dynamic_cast<Put *>(m);
+        Fail* f = dynamic_cast<Fail *>(m);
         if(m == nullptr) continue;
         switch(m->type_) {
             case MsgType::Register:
                 break; // ignore
             case MsgType::Get:
-                store_->network_->send_message(new Status(g->sender_, store_->waitAndGet(g->k_)));
+                handleGet(g);
                 delete(g);
                 break;
             case MsgType::Put:
@@ -372,6 +397,13 @@ void NetworkListener::run() {
                 break;
             case MsgType::Directory:
                 break; // ignore
+            case MsgType::Fail:
+                // wait, and then resend the get
+                sleep(1);
+                send = new Get(f->k_);
+                send->sender_ = store_->idx_;
+                store_->network_->send_message(send);
+                break;
             default:
                 assert(false);
                 break;

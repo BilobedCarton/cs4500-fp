@@ -10,6 +10,7 @@
 #include "../utils/array.h"
 #include "../utils/thread.h"
 #include "../utils/map.h"
+#include "../utils/args.h"
 #include "message.h"
 
 class MsgQue : public Object {
@@ -20,6 +21,8 @@ public:
     MsgQue() {
         arr_ = new Array();
     }
+
+    bool hasMessages() { return arr_->count() > 0; }
 
     void push(Message* m) {
         lock_.lock();
@@ -45,7 +48,7 @@ public:
         value_ = value;
     }
 
-    Object* clone() { return this; }
+    Object* clone() { return new Size_t(value_); }
 };
 
 class MsgQueArr : public Array {
@@ -60,13 +63,20 @@ public:
 
     void put(String* k, size_t v) {
         lock_.lock();
-        Map::put(k, new Size_t(v));
+        Size_t* v_obj = new Size_t(v);
+        Map::put(k, v_obj);
+        p("Registered node ").p(v).p(" as ").pln(k->c_str());
+        delete(v_obj);
         lock_.unlock();
     }
 
     size_t get(String* k) {
         lock_.lock();
-        size_t t = dynamic_cast<Size_t*>(Map::get(k))->value_;
+        Size_t* v = (Size_t *)Map::get(k);
+        if(v == nullptr) {
+            p("Could not find node for: ").pln(k->c_str());
+        }
+        size_t t = v->value_;
         lock_.unlock();
         return t;
     }
@@ -102,13 +112,23 @@ public:
         delete(tid);
     }
 
-    void send_message(Message* msg) { msgques_.get(msg->target_)->push(msg); }
+    void send_message(Message* msg) {
+        Logger::log_send(msg);
+        msgques_.get(msg->target_)->push(msg); 
+    }
 
     Message* receive_message() {
         String* tid = Thread::thread_id();
+        if(tid == nullptr) {
+            return nullptr;
+        }
         size_t idx = threads_.get(tid);
         delete(tid);
-        return msgques_.get(idx)->pop();
+        MsgQue* que = msgques_.get(idx);
+        while(!que->hasMessages()) sleep(1);
+        Message* m = que->pop();
+        Logger::log_receive(m);
+        return m;
     }
 
     // return this because we're faking the network
@@ -144,7 +164,7 @@ public:
         }
         nodes_[0].address = ip_;
         nodes_[0].id = 0;
-        for (size_t i = 2; i < num_nodes; i++)
+        for (size_t i = 1; i < num_nodes; i++)
         {
             Register* msg = dynamic_cast<Register*>(receive_message());
             nodes_[msg->sender_].id = msg->sender_;
@@ -159,11 +179,11 @@ public:
             ports[i] = ntohs(nodes_[i + 1].address.sin_port);
             addresses[i] = new String(inet_ntoa(nodes_[i + 1].address.sin_addr));
         }
-        Directory ipd(num_nodes - 1, ports, addresses);
         for (size_t i = 0; i < num_nodes; i++)
         {
-            ipd.target_ = i;
-            send_message(&ipd);
+            Directory* ipd = new Directory(num_nodes - 1, ports, addresses);
+            ipd->target_ = i;
+            send_message(ipd);
         }
     }
 
@@ -181,8 +201,8 @@ public:
         inet_ntop(AF_INET, &ip_.sin_addr, ip_arr, INET_ADDRSTRLEN);
         String* ip = new String(ip_arr);
 
-        Register msg(*ip, port);
-        send_message(&msg);
+        Register* msg = new Register(*ip, port);
+        send_message(msg);
 
         Directory* ipd = dynamic_cast<Directory*>(receive_message());
         NodeInfo* nodes = new NodeInfo[num_nodes];
@@ -209,8 +229,18 @@ public:
         ip_.sin_family = AF_INET;
         ip_.sin_addr.s_addr = INADDR_ANY;
         ip_.sin_port = htons(port);
-        assert(bind(sock_, (sockaddr*)&ip_, sizeof(ip_)) >= 0);
+        p("Using address: ").pln(inet_ntoa(ip_.sin_addr));
+        if(bind(sock_, (sockaddr*)&ip_, sizeof(sockaddr)) < 0) {
+            p("Bind failed: errno - ").pln(errno);
+            assert(false);
+        }
         assert(listen(sock_, 100) >= 0); // connections queue size
+    }
+
+    void register_node(size_t idx) {
+        assert(args != nullptr);
+        if(idx == 0) server_init(idx, args->port, args->num_nodes);
+        else client_init(idx, args->port, args->server_adr, args->server_port, args->num_nodes);
     }
 
     void send_message(Message* msg) {
@@ -218,7 +248,11 @@ public:
         NodeInfo& tgt = nodes_[msg->target_];
         int conn = socket(AF_INET, SOCK_STREAM, 0);
         assert(conn >= 0 && "Unable to create client socket");
-        if(connect(conn, (sockaddr*)&tgt.address, sizeof(tgt.address)) < 0) assert(false && "Unable to connect to remote node");
+        if(connect(conn, (sockaddr*)&tgt.address, sizeof(sockaddr)) < 0) {
+            perror("Unable to connect to remote node");
+            assert(false);
+        } 
+        Logger::log_send(msg);
         SerialString* ss = msg->serialize();
         send(conn, &ss->size_, sizeof(size_t), 0);
         send(conn, ss->data_, ss->size_, 0);
@@ -237,8 +271,10 @@ public:
         SerialString* ss = new SerialString(buf, size);
         delete[](buf);
         Message* msg = msg_deserialize(ss);
+        if(msg == nullptr) return nullptr;
         delete(ss);
 
+        Logger::log_receive(msg);
         return msg;
     }
 };

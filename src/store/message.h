@@ -7,10 +7,11 @@
 
 #include "../utils/serial.h"
 #include "../utils/string.h"
+#include "../utils/thread.h"
 #include "key.h"
 #include "value.h"
 
-enum class MsgType { Register = 0, Get, Put, Status, Directory };
+enum class MsgType { Register = 0, Get, Put, Status, Directory, Fail };
 
 class Message : public SerializableObject {
 public:
@@ -179,6 +180,23 @@ public:
         Get* cast = dynamic_cast<Get *>(other);
         if(cast == nullptr) return false;
         return k_->equals(cast->k_);
+    }
+};
+
+class Fail : public Get {
+public:
+
+    Fail(Key* k) : Get(k) {
+        type_ = MsgType::Fail;
+    }
+
+    static Fail* deserialize(SerialString* string) {
+        Get* g = Get::deserialize(string);
+        Fail* f = new Fail(g->k_);
+        f->target_ = g->target_;
+        f->sender_ = g->sender_;
+        f->type_ = MsgType::Fail;
+        return f;
     }
 };
 
@@ -426,8 +444,70 @@ static Message* msg_deserialize(SerialString* serial) {
             return Status::deserialize(serial);
         case MsgType::Directory:
             return Directory::deserialize(serial);
+        case MsgType::Fail:
+            return Fail::deserialize(serial);
         default:
             assert(false);
             return nullptr;
     }
 }
+
+static Lock LOG_LOCK;
+
+class Logger : public Object {
+public:
+    static void log(char* msg) {
+        // Sys s;
+        LOG_LOCK.lock();
+
+        LOG_LOCK.unlock();
+    }
+
+    static void log_msg(Message* m) {
+        Sys s;
+        s.p(m->sender_).p(" to ").p(m->target_).p(" of type ");
+        switch(m->type_) {
+            case MsgType::Register:
+                s.p("Register");
+                break;
+            case MsgType::Get:
+                s.p("Get for key ").p(dynamic_cast<Get *>(m)->k_->name_)
+                 .p(" in node ").p(dynamic_cast<Get *>(m)->k_->idx_);
+                break;
+            case MsgType::Put:
+                s.p("Put for key ").p(dynamic_cast<Put *>(m)->k_->name_)
+                 .p(" in node ").p(dynamic_cast<Put *>(m)->k_->idx_);
+                break;
+            case MsgType::Status:
+                s.p("Status");
+                break;
+            case MsgType::Directory:
+                s.p("Directory");
+                break;
+            case MsgType::Fail:
+                s.p("Fail for key ").p(dynamic_cast<Get *>(m)->k_->name_)
+                 .p(" in node ").p(dynamic_cast<Get *>(m)->k_->idx_);
+                break;
+            default:
+                assert(false);
+                return;
+        }
+        s.p(" and size ").pln(m->serialize()->size_);
+    }
+
+    static void log_send(Message* m) {
+        Sys s;
+        LOG_LOCK.lock();
+        s.p("Message sent from ");
+        log_msg(m);
+        LOG_LOCK.unlock();
+    } 
+
+    static void log_receive(Message* m) {
+        Sys s;
+        LOG_LOCK.lock();
+        s.p("Message received from ");
+        log_msg(m);
+        LOG_LOCK.unlock();
+    }
+};
