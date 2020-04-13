@@ -6,8 +6,9 @@
 class TestKey : public Test {
 public:
     Key* key = new Key("test", 5);
-    Key* k = new Key("test", 5);;
-    Key* not_k = new Key("hello", 4);;
+    Key* k = new Key("test", 5);
+    Key* not_k = new Key("hello", 4);
+    Key* long_key = new Key("A key with a longer name than usual", 3);
     Object* obj = new Object();
 
     ~TestKey() {
@@ -48,8 +49,17 @@ public:
         return true;
     }
 
+    bool testSerialize() {
+        assert(Key::deserialize(key->serialize())->equals(key));
+        assert(Key::deserialize(not_k->serialize())->equals(not_k));
+        assert(Key::deserialize(long_key->serialize())->equals(long_key));
+
+        OK("Key Serialization - passed.");
+        return true;
+    }
+
     bool run() {
-        return testEquals() && testHash() && testClone();
+        return testEquals() && testHash() && testClone() && testSerialize();
     }
 };
 
