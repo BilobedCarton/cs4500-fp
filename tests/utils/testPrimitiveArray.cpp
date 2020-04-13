@@ -7,7 +7,8 @@ class TestPrimitiveArray : public Test {
 public:
 
     bool run() {
-
+        OK("PrimitiveArray tests not implemented.");
+        return true;
     }
 };
 

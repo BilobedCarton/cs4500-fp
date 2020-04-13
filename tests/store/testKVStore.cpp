@@ -181,6 +181,9 @@ public:
     WaitAndGetThread(KVStore* s, Key* k) {
         s_ = s;
         k_ = k;
+
+        s_->network_->register_node(s->idx_);
+
         v_ = nullptr;
     }
 
@@ -319,7 +322,7 @@ public:
 
 int main() {
     TestKVStoreNode testNode;
-    TestLocalKVStore testLocal;
     testNode.testSuccess();
+    TestLocalKVStore testLocal;
     testLocal.testSuccess();
 }

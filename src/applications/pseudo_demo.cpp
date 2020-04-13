@@ -7,10 +7,6 @@ int main() {
     Demo* count = new Demo(1, net);
     Demo* sum = new Demo(2, net);
 
-    // prod.run_();
-    // count.run_();
-    // sum.run_();
-
     NodeThread prodThread(prod);
     NodeThread countThread(count);
     NodeThread sumThread(sum);
