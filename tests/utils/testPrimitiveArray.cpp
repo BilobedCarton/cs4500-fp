@@ -8,13 +8,19 @@ public:
 
     PrimitiveArrayChunk<int>* largeChunk1 = new PrimitiveArrayChunk<int>(16);
     PrimitiveArrayChunk<int>* largeChunk2 = new PrimitiveArrayChunk<int>(16);
-    PrimitiveArrayChunk<int>* largeChunk3 = new PrimitiveArrayChunk<int>(16);
     PrimitiveArrayChunk<int>* averageChunk1 = new PrimitiveArrayChunk<int>(8);
     PrimitiveArrayChunk<int>* averageChunk2 = new PrimitiveArrayChunk<int>(8);
-    PrimitiveArrayChunk<int>* averageChunk3 = new PrimitiveArrayChunk<int>(8);
     PrimitiveArrayChunk<int>* smallChunk1 = new PrimitiveArrayChunk<int>(2);
     PrimitiveArrayChunk<int>* smallChunk2 = new PrimitiveArrayChunk<int>(2);
-    PrimitiveArrayChunk<int>* smallChunk3 = new PrimitiveArrayChunk<int>(2);
+
+    ~TestPrimitiveArrayChunk() {
+        delete(largeChunk1);
+        delete(largeChunk2);
+        delete(averageChunk1);
+        delete(averageChunk2);
+        delete(smallChunk1);
+        delete(smallChunk2);
+    }
 
     bool testPushBack() { 
         smallChunk1->push_back(1);
