@@ -373,7 +373,7 @@ void NetworkListener::handleGet(Get* g)  {
 }
 
 void NetworkListener::run() {
-    if(dynamic_cast<PseudoNetwork *>(store_) != nullptr) store_->network_->register_node(store_->idx_);
+    if(dynamic_cast<PseudoNetwork *>(store_->network_) != nullptr) store_->network_->register_node(store_->idx_);
     while(store_ != nullptr) { // go forever
         Message* send;
         Message* m = store_->network_->receive_message();
@@ -386,7 +386,6 @@ void NetworkListener::run() {
                 break; // ignore
             case MsgType::Get:
                 handleGet(g);
-                //delete(g);
                 break;
             case MsgType::Put:
                 store_->put(p->k_, p->v_);

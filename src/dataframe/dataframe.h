@@ -9,10 +9,12 @@
 #include "../utils/thread.h"
 
 #include "../store/kvstore.h"
+#include "../store/key.h"
 
 #include "schema.h"
 #include "column.h"
 #include "row.h"
+
  
 /*******************************************************************************
  *  Rower::
@@ -49,11 +51,13 @@ class DataFrame : public SerializableObject {
  public:
   Schema* _schema;
   Array* _cols;
+
  
   /** Create a data frame with the same columns as the give df but no rows */
   DataFrame(DataFrame& df) {
     _schema = new Schema();
     _cols = new Array();
+
     for (int i = 0; i < df.get_schema().width(); ++i)
     {
       switch(df.get_schema().col_type(i)) {
@@ -80,6 +84,7 @@ class DataFrame : public SerializableObject {
   DataFrame(Schema& schema) {
     _schema = new Schema(schema);
     _cols = new Array();
+
     for (int i = 0; i < _schema->width(); ++i)
     {
       switch(_schema->col_type(i)) {

@@ -125,7 +125,7 @@ public:
         size_t idx = threads_.get(tid);
         delete(tid);
         MsgQue* que = msgques_.get(idx);
-        while(!que->hasMessages()) sleep(1);
+        if(!que->hasMessages()) return nullptr;
         Message* m = que->pop();
         Logger::log_receive(m);
         return m;

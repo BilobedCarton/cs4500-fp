@@ -276,7 +276,6 @@ public:
     bool testWaitAndGet() {
         Key k("test", 1);
         assert(reg->waitAndGet(&k)->serialized()->equals(v->serialized()));
-
         Key k2("test", 0);
         WaitAndGetThread* thread = new WaitAndGetThread(small, &k2);
 
