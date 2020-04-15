@@ -3,7 +3,7 @@ temp:
 	lldb ./tests/testDistributedColumn.bin
 
 clean-temp:
-	rm -r testDistributedColumn.bin *.dSYM
+	rm -r ./tests/testDistributedColumn.bin ./tests/testDistributedColumn.bin.dSYM
 
 build-demo:
 	g++ -o pseudo_demo -Wall -std=c++17 ./src/applications/pseudo_demo.cpp
