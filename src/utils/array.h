@@ -101,7 +101,7 @@ public:
             delete[](list_);
             list_ = new_list;
         }
-        list_[size_++] = obj;
+        list_[size_++] = obj->clone();
         return this;
     }
 

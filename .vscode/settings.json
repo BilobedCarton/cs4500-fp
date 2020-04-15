@@ -70,4 +70,9 @@
         "__functional_03": "cpp",
         "memory_resource": "cpp"
     }
+    "configurations": [
+        {
+            "includePath": ["$/Documents/neu_4/CS4500/finalproject"]
+        }
+    ]
 }

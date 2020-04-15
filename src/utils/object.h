@@ -27,4 +27,12 @@ public:
 
     /** Returned c_str is owned by the object, don't modify nor delete. */
     virtual char* c_str() { return nullptr; }
-}; 
+};
+
+bool operator==(Object& a, Object& b) {
+    return a.equals(&b);
+}
+
+bool operator !=(Object& a, Object& b) {
+    return !a.equals(&b);
+}

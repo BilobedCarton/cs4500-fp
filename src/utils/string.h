@@ -17,6 +17,11 @@ public:
     size_t size_; // number of characters excluding terminate (\0)
     char *cstr_;  // owned; char array
 
+    String() {
+        size_ = 0;
+        cstr_ = nullptr;
+    }
+
     /** Build a string from a string constant */
     String(char const* cstr, size_t len) {
        size_ = len;
@@ -98,6 +103,10 @@ public:
         return new String(serial->data_ + sizeof(size_t));
     }
  };
+
+ bool operator!=(String a, String b) {
+     return !a.equals(&b);
+ }
 
 /** A string buffer builds a string from various pieces.
  *  author: jv 

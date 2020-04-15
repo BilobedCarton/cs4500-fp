@@ -107,7 +107,7 @@ public:
         pos += sizeof(size_t);
 
         // data
-        memcpy(serial + pos, data_, sizeof(T) * capacity_);
+        memcpy(serial + pos, (void*)data_, sizeof(T) * capacity_);
         pos += sizeof(T) * capacity_;
 
         // missing

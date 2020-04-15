@@ -266,10 +266,10 @@ public:
      * 
      */
     void grow() {
-
+        // do we need to grow?
         if(((double)count()) / capacity_ <= GROWTH_THRESHOLD) return;
 
-        // grow the array
+        // yes, grow the array
         capacity_ *= GROWTH_FACTOR; 
         KVStore_Node** old = nodes_;
         nodes_ = new KVStore_Node*[capacity_];
@@ -277,7 +277,6 @@ public:
         {
             nodes_[i] = nullptr;
         }
-        
 
         // reinsert each node to its new proper location
         for (size_t i = 0; i < capacity_ / GROWTH_FACTOR; i++)
@@ -309,7 +308,7 @@ public:
         if(nodes_[get_position(k)] == nullptr) v = nullptr;
         else v = nodes_[get_position(k)]->getValue(k);
         prod_.unlock();
-        return v;
+        return v->clone();
     }
 
     /**

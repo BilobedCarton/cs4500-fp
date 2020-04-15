@@ -1,3 +1,10 @@
+temp:
+	cd ./tests; g++ -o testDistributedColumn.bin -Wall -g -std=c++17 ./dataframe/testDistributedColumn.cpp
+	lldb ./tests/testDistributedColumn.bin
+
+clean-temp:
+	rm -r testDistributedColumn.bin *.dSYM
+
 build-demo:
 	g++ -o pseudo_demo -Wall -std=c++17 ./src/applications/pseudo_demo.cpp
 	g++ -o networked_demo -Wall -std=c++17 ./src/applications/networked_demo.cpp

@@ -51,6 +51,7 @@ class DataFrame : public SerializableObject {
  public:
   Schema* _schema;
   Array* _cols;
+  char* name_; // TODO: remove
 
  
   /** Create a data frame with the same columns as the give df but no rows */
