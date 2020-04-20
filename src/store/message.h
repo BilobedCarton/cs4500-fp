@@ -212,9 +212,10 @@ public:
     }
 
     Object* clone() {
-        Get* c = dynamic_cast<Get*>(Get::clone());
-        c->type_ = MsgType::Fail;
-        return c;
+        Fail* f = new Fail(k_);
+        f->target_ = target_;
+        f->sender_ = sender_;
+        return f;
     }
 };
 
