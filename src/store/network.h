@@ -7,6 +7,7 @@
 #include <arpa/inet.h>
 
 #include "../utils/object.h"
+#include "../utils/string.h"
 #include "../utils/array.h"
 #include "../utils/thread.h"
 #include "../utils/map.h"
