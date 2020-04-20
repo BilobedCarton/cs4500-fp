@@ -20,6 +20,8 @@ public:
     char* server_adr = nullptr;
     size_t server_port = 0;
     
+    Args() {}
+
     Args(int argc, char** argv) {
         for (size_t i = 1; i < argc; i+=2)
         {

@@ -123,29 +123,12 @@ public:
     }
 
     bool run() {
-
         return testPushBack() && testPushBackMissing() && testIsMissing() && testSetMissing() && testSet() && testCloneAndEquals() && testSerialization();
     }
 };
 
-class TestPrimitiveArray : public Test {
-public:
-
-    // PrimitiveArray* pa1 = new PrimitiveArray()
-
-    // bool testPushBackMissing() {
-
-    // }
-
-    bool run() {
-        OK("PrimitiveArray tests not implemented.");
-        return true;
-    }
-};
 
 int main() {
-    TestPrimitiveArray testPrimitiveArray;
     TestPrimitiveArrayChunk testPrimitiveArrayChunk;
-    testPrimitiveArray.testSuccess();
     testPrimitiveArrayChunk.testSuccess();
 }

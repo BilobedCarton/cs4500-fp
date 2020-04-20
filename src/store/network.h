@@ -38,6 +38,10 @@ public:
         lock_.unlock();
         return m;
     }
+
+    Object* clone() {
+        return this;
+    }
 };
 
 class Size_t : public Object {

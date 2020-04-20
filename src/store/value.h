@@ -33,7 +33,7 @@ public:
      * 
      * @param so the serializable object stored in this value
      */
-    Value(SerializableObject* so) {
+    Value(Serializable* so) {
         serialized_ = so->serialize();
     }
 

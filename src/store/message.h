@@ -63,6 +63,10 @@ public:
         if(cast == nullptr) return false;
         return (type_ == cast->type_ && target_ == cast->target_ && sender_ == cast->sender_);
     }
+
+    Object* clone() {
+        return new Message(*this);
+    }
 };
 
 class Register : public Message {
@@ -127,6 +131,10 @@ public:
              && client.sin_port == cast->client.sin_port
              && port == cast->port);
     }
+
+    Object* clone() {
+        return new Register(*this, client, port);
+    }
 };
 
 class Get : public Message {
@@ -181,6 +189,10 @@ public:
         if(cast == nullptr) return false;
         return k_->equals(cast->k_);
     }
+
+    Object* clone() {
+        return new Get(*this, *k_);
+    }
 };
 
 class Fail : public Get {
@@ -197,6 +209,12 @@ public:
         f->sender_ = g->sender_;
         f->type_ = MsgType::Fail;
         return f;
+    }
+
+    Object* clone() {
+        Get* c = dynamic_cast<Get*>(Get::clone());
+        c->type_ = MsgType::Fail;
+        return c;
     }
 };
 
@@ -256,6 +274,10 @@ public:
         if(cast == nullptr) return false;
         return v_->equals(cast->v_);
     }
+
+    Object* clone() {
+        return new Put(*this, *k_, *v_);
+    }
 };
 
 class Status : public Message {
@@ -311,6 +333,10 @@ public:
         Status* cast = dynamic_cast<Status *>(other);
         if(cast == nullptr) return false;
         return v_->equals(cast->v_);
+    }
+
+    Object* clone() {
+        return new Status(*this, *v_);
     }
 };
 
@@ -427,6 +453,17 @@ public:
             if(!addresses_[i]->equals(cast->addresses_[i])) return false;
         }
         return true;
+    }
+
+    Object* clone() {
+        size_t* ps = new size_t[num_nodes_];
+        String** adds = new String*[num_nodes_];
+        for (size_t i = 0; i < num_nodes_; i++)
+        {
+            ps[i] = ports_[i];
+            adds[i] = new String(*addresses_[i]);
+        }
+        return new Directory(*this, num_nodes_, ps, adds);
     }
 };
 

@@ -6,6 +6,7 @@
 #include "../utils/args.h"
 
 #include "dataframe.h"
+#include "../store/value.h"
 #include "../store/kvstore.h"
 
 // page size divided by type size
