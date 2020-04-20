@@ -6,8 +6,8 @@ clean-temp:
 	rm -r ./tests/testDistributedColumn.bin ./tests/testDistributedColumn.bin.dSYM
 
 build-demo:
-	g++ -o pseudo_demo -Wall -std=c++17 -g ./src/applications/pseudo_demo.cpp
-	g++ -o networked_demo -Wall -std=c++17 -g ./src/applications/networked_demo.cpp
+	g++ -o pseudo_demo -Wall -std=c++17 ./src/applications/pseudo_demo.cpp
+	g++ -o networked_demo -Wall -std=c++17 ./src/applications/networked_demo.cpp
 
 run-pseudo-demo:
 	./pseudo_demo
