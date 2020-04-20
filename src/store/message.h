@@ -490,13 +490,15 @@ static Message* msg_deserialize(SerialString* serial) {
 }
 
 static Lock LOG_LOCK;
+static bool SUPRESS_LOGGING = false;
 
 class Logger : public Object {
 public:
     static void log(char* msg) {
-        // Sys s;
+        if(SUPRESS_LOGGING) return;
+        Sys s;
         LOG_LOCK.lock();
-
+        s.pln(msg);
         LOG_LOCK.unlock();
     }
 
@@ -533,6 +535,7 @@ public:
     }
 
     static void log_send(Message* m) {
+        if(SUPRESS_LOGGING) return;
         Sys s;
         LOG_LOCK.lock();
         s.p("Message sent from ");
@@ -541,6 +544,7 @@ public:
     } 
 
     static void log_receive(Message* m) {
+        if(SUPRESS_LOGGING) return;
         Sys s;
         LOG_LOCK.lock();
         s.p("Message received from ");

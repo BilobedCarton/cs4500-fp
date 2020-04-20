@@ -308,7 +308,12 @@ public:
         if(nodes_[get_position(k)] == nullptr) v = nullptr;
         else v = nodes_[get_position(k)]->getValue(k);
         prod_.unlock();
-        return v->clone();
+
+        if (v != nullptr) {
+            return v->clone();
+        } else {
+            return nullptr;
+        }
     }
 
     /**

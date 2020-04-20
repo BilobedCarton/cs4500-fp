@@ -127,7 +127,7 @@ public:
         // already supplied our columns with values so we can test those.
         for (size_t i = 0; i < 4096 * 3; i++)
         {
-            if(i % sizeof(int) == 0) assert(dc0->get(i / sizeof(int) == i));
+            if(i % sizeof(int) == 0) assert(dc0->get(i / sizeof(int)) == i);
             if(i % sizeof(double) == 0) assert(doubleAlmostEqual(dc1->get(i / sizeof(double)), i * 1.1, 3));
             // if(i % sizeof(String) == 0) {
             //     char* str = to_str<size_t>(i);
