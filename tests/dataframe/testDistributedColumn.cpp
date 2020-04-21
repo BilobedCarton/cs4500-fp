@@ -67,7 +67,7 @@ public:
         // dc2 = new DistributedColumn<String>(2);
 
         dc0->set_store(store0);
-        dc1->set_store(store0);
+        dc1->set_store(store1->store_);
         // dc2->set_store(store0);
 
         assert(dc0->size() == 0);
@@ -205,8 +205,34 @@ public:
     }
 
     bool testGetLocalChunks() {
+        PrimitiveArray<int>* lc0_0 = dc0->get_local_chunks(0);
+        PrimitiveArray<int>* lc0_1 = dc0->get_local_chunks(1);
+        PrimitiveArray<int>* lc0_2 = dc0->get_local_chunks(2);
 
-        OK("DistributedColumn::getLocalChunks(node) -- passed.");
+        assert(lc0_0->chunks_ == 2);
+        assert(lc0_1->chunks_ == 1);
+        assert(lc0_2->chunks_ == 1);
+        delete(lc0_0);
+        delete(lc0_1);
+        delete(lc0_2);
+
+        for (size_t i = 0; i < 4096 * 3 / sizeof(int); i++)
+        {
+            dc0->push_back(i, nullptr);
+        }
+
+        lc0_0 = dc0->get_local_chunks(0);
+        lc0_1 = dc0->get_local_chunks(1);
+        lc0_2 = dc0->get_local_chunks(2);
+
+        assert(lc0_0->chunks_ == 3);
+        assert(lc0_1->chunks_ == 2);
+        assert(lc0_2->chunks_ == 2);
+        delete(lc0_0);
+        delete(lc0_1);
+        delete(lc0_2);
+
+        OK("DistributedColumn::get_local_chunks(node) -- passed.");
         return true;
     }
 
