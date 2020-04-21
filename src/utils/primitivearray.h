@@ -325,8 +325,13 @@ public:
     // strings are owned
     ~StringArrayChunk() {
         for (size_t i = 0; i < size_; i++) {
-            delete(data_[i]);
+            if(!isMissing(i)) delete(data_[i]);
         }
+    }
+
+    void setMissing(size_t idx) {
+        if(idx < size_ && !isMissing(idx)) delete(data_[idx]);
+        PrimitiveArrayChunk<String *>::setMissing(idx);
     }
 
     bool push_back(String* v) {
@@ -350,20 +355,26 @@ public:
         return true;
     }
 
+    StringArrayChunk* clone() { return new StringArrayChunk(this); }
+
     SerialString* serialize() {
         // data
         SerialString** serial_data = new SerialString*[size_];
         size_t data_size = 0;
         for (size_t i = 0; i < size_; i++)
         {
+            char* d = "";
+            size_t sz;
             if(isMissing(i)) {
-                serial_data[i] = new SerialString("0", sizeof(size_t));
-                data_size += sizeof(size_t);
+                sz = 0;
             }
             else {
-                serial_data[i] = get(i)->serialize();
-                data_size += serial_data[i]->size_;
+                Sys s;
+                d = s.duplicate(get(i)->c_str());
+                sz = strlen(d);
             }
+            serial_data[i] = new SerialString(d, sz);
+            data_size += sz + sizeof(size_t);
         }
 
         char* serial = new char[sizeof(size_t) + sizeof(size_t) + data_size + (sizeof(bool) * capacity_)];
@@ -380,6 +391,8 @@ public:
         // data
         for (size_t i = 0; i < size_; i++)
         {
+            memcpy(&serial[pos], &serial_data[i]->size_, sizeof(size_t));
+            pos += sizeof(size_t);
             memcpy(&serial[pos], serial_data[i]->data_, serial_data[i]->size_);
             pos += serial_data[i]->size_;
             delete(serial_data[i]);
@@ -387,8 +400,8 @@ public:
         delete[](serial_data);
 
         // missing
-        memcpy(&serial[pos], missing_, sizeof(bool) * capacity_);
-        pos += sizeof(bool) * capacity_;
+        memcpy(&serial[pos], missing_, capacity_ * sizeof(bool));
+        pos += capacity_ * sizeof(bool);
 
         SerialString* s = new SerialString(serial, pos);
         delete[](serial);
@@ -418,17 +431,22 @@ public:
             memcpy(&size, &serialized->data_[pos], sizeof(size_t));
             pos += sizeof(size_t);
 
-            SerialString* serial = new SerialString(&serialized->data_[pos], size);
+            String* s = new String(&serialized->data_[pos], size);
             pos += size;
 
-            String* s = String::deserialize(serial);
             chunk->set(i, s);
             delete(s);
-            delete(serial);
         }        
 
         // missing
-        memcpy(&chunk->missing_, &serialized->data_[pos], sizeof(bool) * chunk->capacity_);
+        memcpy(chunk->missing_, &serialized->data_[pos], sizeof(bool) * chunk->capacity_);
+        for (size_t i = 0; i < chunk->size_; i++)
+        {
+            if(chunk->isMissing(i)) {
+                delete(chunk->data_[i]);
+                chunk->data_[i] = nullptr;
+            }
+        }
 
         return chunk;
     }
