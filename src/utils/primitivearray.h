@@ -125,22 +125,22 @@ public:
 
         // capacity
         size_t cap;
-        memcpy(&cap, &serialized->data_[pos], sizeof(size_t));
+        memcpy(&cap, serialized->data_ + pos, sizeof(size_t));
         pos += sizeof(size_t);
         assert(cap != 0);
 
         PrimitiveArrayChunk<T>* chunk = new PrimitiveArrayChunk<T>(cap);
         
         // size
-        memcpy(&chunk->size_, &serialized->data_[pos], sizeof(size_t));
+        memcpy(&chunk->size_, serialized->data_ + pos, sizeof(size_t));
         pos += sizeof(size_t);
 
         // data
-        memcpy(chunk->data_, &serialized->data_[pos], sizeof(T) * chunk->capacity_);
+        memcpy(chunk->data_, serialized->data_ + pos, sizeof(T) * chunk->capacity_);
         pos += sizeof(T) * chunk->capacity_;
 
         // missing
-        memcpy(chunk->missing_, &serialized->data_[pos], sizeof(bool) * chunk->capacity_);
+        memcpy(chunk->missing_, serialized->data_ + pos, sizeof(bool) * chunk->capacity_);
 
         return chunk;
     }

@@ -41,9 +41,8 @@ build-tests:
 	cd ./tests; g++ -o testSchema.bin -Wall -std=c++17 ./dataframe/testSchema.cpp
 	cd ./tests; g++ -o testRow.bin -Wall -std=c++17 ./dataframe/testRow.cpp
 	cd ./tests; g++ -o testColumn.bin -Wall -std=c++17 ./dataframe/testColumn.cpp
+	cd ./tests; g++ -o testDistributedColumn.bin -Wall -std=c++17 ./dataframe/testDistributedColumn.cpp
 	cd ./tests; g++ -o testDataframe.bin -Wall -std=c++17 ./dataframe/testDataframe.cpp
-	cd ./tests; g++ -o testDistributedColumn -Wall -std=c++17 ./dataframe/testDistributedColumn.cpp
-	cd ./tests; g++ -o testMessage.bin -Wall -std=c++17 ./store/testMessage.cpp
 
 run-tests:
 	-./tests/testArray.bin; echo
@@ -57,8 +56,8 @@ run-tests:
 	-./tests/testSchema.bin; echo
 	-./tests/testRow.bin; echo
 	-./tests/testColumn.bin; echo
-	-./tests/testDataframe.bin; echo
 	-./tests/testDistributedColumn.bin; echo
+	-./tests/testDataframe.bin; echo
 
 clean-tests:
 	-cd ./tests; rm *.bin

@@ -307,13 +307,12 @@ public:
         prod_.lock();
         if(nodes_[get_position(k)] == nullptr) v = nullptr;
         else v = nodes_[get_position(k)]->getValue(k);
+        if (v != nullptr) {
+            v = v->clone();
+        }
         prod_.unlock();
 
-        if (v != nullptr) {
-            return v->clone();
-        } else {
-            return nullptr;
-        }
+        return v;
     }
 
     /**
