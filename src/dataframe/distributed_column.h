@@ -12,6 +12,25 @@
 // page size divided by type size
 #define CHUNK_MEMORY 4096
 
+/**
+ * @brief Metadata for a chunk, used for representing locally cached chunk
+ * 
+ */
+class ChunkMeta : public Object {
+public:
+    Key* key; // key in local store - owned
+    size_t chunk; // chunk index
+
+    ChunkMeta(Key* k, size_t c) {
+        key = k;
+        chunk = c;
+    }
+
+    ~ChunkMeta() {
+        delete(key);
+    }
+};
+
 template<class T>
 /** 
  * A DistributedColumn is a collection of Keys which point to data belonging to this column.
@@ -24,7 +43,8 @@ public:
     KVStore* store_; // not owned
     Array* keys_; // owned
     size_t chunk_size_; // how many elements are stored in a chunk
-    PrimitiveArrayChunk<T>* last_chunk_; // owned
+    ChunkMeta* cached_chunk_; // owned - the chunk most recently accessed, only exists if we have a store
+    PrimitiveArrayChunk<T>* last_chunk_; // owned - the chunk currently being filled by push_back
     size_t next_node_; // where the next chunk will be shipped when completed
 
     /** Create an empty DistributedColumn representing the provided index */
@@ -32,6 +52,7 @@ public:
         idx_ = idx;
         keys_ = new Array();
         chunk_size_ = CHUNK_MEMORY / sizeof(T);
+        cached_chunk_ = nullptr;
         last_chunk_ = new PrimitiveArrayChunk<T>(chunk_size_);
         next_node_ = 0;
     }
@@ -81,18 +102,34 @@ public:
         size_t chunk_idx = idx / chunk_size_;
         size_t idx_in_chunk = idx - (chunk_idx * chunk_size_);
 
-        // check if pulling from cached chunk
+        // check if pulling from last chunk
         if(chunk_idx == keys_->count()) return last_chunk_->get(idx_in_chunk);
 
-        // get our key, and grab the value from the store
-        Key* k = dynamic_cast<Key *>(keys_->get(chunk_idx));
+        assert(store_ != nullptr); // at this point we need a store
+        Key* k;
+        if(cached_chunk_ != nullptr && cached_chunk_->chunk == chunk_idx) {
+            // grab key to cached chunk
+            k = cached_chunk_->key;
+        } else {
+            // grab key to external chunk
+            k = dynamic_cast<Key *>(keys_->get(chunk_idx));
+        }
+
+        //  grab the value from the store
         assert(k != nullptr);
         Value* chunkV = store_->get(k);
         PrimitiveArrayChunk<T>* chunk = PrimitiveArrayChunk<T>::deserialize(chunkV->serialized());
-        delete(chunkV);
         assert(chunk != nullptr);
+
+        // cache the chunk if we haven't already
+        if(k->idx_ != store_->idx_) {
+            if(cached_chunk_ != nullptr) delete(cached_chunk_);
+            cached_chunk_ = new ChunkMeta(new Key(k->name_, store_->idx_), chunk_idx);
+            store_->put(cached_chunk_->key, chunkV);
+        }
         
         T v = chunk->get(idx_in_chunk);
+        delete(chunkV);
         delete(chunk);
         return v;
     }
@@ -139,6 +176,16 @@ public:
         return clone;
     }
 
+    bool equals(Object* other) {
+        DistributedColumn<T>* cast = dynamic_cast<DistributedColumn<T>*>(other);
+        if(cast == nullptr) return false;
+        if(idx_ != cast->idx_) return false;
+        if(chunk_size_ != cast->chunk_size_) return false;
+        if(next_node_ != cast->next_node_) return false;
+        if(!keys_->equals(cast->keys_)) return false;
+        return last_chunk_->equals(cast->last_chunk_);
+    }
+
     /** Return a serialized version of this column's contents */
     SerialString* serialize() {
         size_t keys_size = 0;
@@ -174,7 +221,7 @@ public:
         delete[](keys_serials);
 
         // last_chunk_
-        memcpy(arr + pos, &last_chunk_serial->data_, last_chunk_serial->size_);
+        memcpy(arr + pos, last_chunk_serial->data_, last_chunk_serial->size_);
         pos += last_chunk_serial->size_;
         delete(last_chunk_serial);
 

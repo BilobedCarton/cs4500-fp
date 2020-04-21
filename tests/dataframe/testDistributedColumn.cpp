@@ -40,7 +40,6 @@ public:
     // DistributedColumn<String>* dc2;
 
     TestDistributedColumn() {
-        SUPRESS_LOGGING = true;
         args = new Args();
         args->num_nodes = 3;
         store0->network_->register_node(0);
@@ -176,80 +175,32 @@ public:
         return true;
     }
 
-    bool testSerialize() {
-        DistributedColumn<int>* dcser1 = new DistributedColumn<int>(0);
-        dcser1->push_back(0, nullptr);
-        dcser1->push_back(1, nullptr);
-        dcser1->push_back(2, nullptr);
-        SerialString* afterSer1 = dcser1->serialize();
+    bool testEquals() {
+        DistributedColumn<int>* clone = dynamic_cast<DistributedColumn<int>*>(dc0->clone());
+        assert(dc0->equals(clone));
+        assert(!dc1->equals(clone));
+        delete(clone);
 
-        DistributedColumn<int>* dcser2 = new DistributedColumn<int>(0);
-        dcser2->push_back(0, nullptr);
-        dcser2->push_back(1, nullptr);
-        dcser2->push_back(2, nullptr);
-        SerialString* afterSer2 = dcser2->serialize();
-
-        DistributedColumn<int>* dcser3 = new DistributedColumn<int>(0);
-        dcser3->push_back(120, nullptr);
-        dcser3->push_back(121, nullptr);
-        dcser3->push_back(122, nullptr);
-        SerialString* afterSer3 = dcser3->serialize();
-        
-        assert(afterSer1->equals(afterSer2));
-        assert(afterSer1->equals(afterSer3) == false);
-
-        delete(dcser1);
-        delete(dcser2);
-        delete(dcser3);
-        delete(afterSer1);
-        delete(afterSer2);
-        delete(afterSer3);
-        
-        OK("DistributedColumn::serialize() -- passed.");
+        OK("DistributedColumn::equals(other) -- passsed.");
         return true;
     }
 
-    bool testDeserialize() {
-        DistributedColumn<int>* dcser1 = new DistributedColumn<int>(0);
-        dcser1->push_back(0, nullptr);
-        dcser1->push_back(1, nullptr);
-        dcser1->push_back(2, nullptr);
-        SerialString* serialized1 = dcser1->serialize();
+    bool testSerialization() {
+        SerialString* ss0 = dc0->serialize();
+        SerialString* ss1 = dc1->serialize();
 
-        DistributedColumn<int>* dcser2 = new DistributedColumn<int>(0);
-        dcser2->push_back(0, nullptr);
-        dcser2->push_back(1, nullptr);
-        dcser2->push_back(2, nullptr);
-        SerialString* serialized2 = dcser2->serialize();
+        DistributedColumn<int>* dc0_after = DistributedColumn<int>::deserialize(ss0);
+        DistributedColumn<double>* dc1_after = DistributedColumn<double>::deserialize(ss1);
 
-        DistributedColumn<int>* dcser3 = new DistributedColumn<int>(0);
-        dcser3->push_back(120, nullptr);
-        dcser3->push_back(121, nullptr);
-        dcser3->push_back(122, nullptr);
-        SerialString* serialized3 = dcser3->serialize();
+        assert(dc0->equals(dc0_after));
+        assert(dc1->equals(dc1_after));
 
-        DistributedColumn<int>* afterD1 = DistributedColumn<int>::deserialize(serialized1);
-        DistributedColumn<int>* afterD2 = DistributedColumn<int>::deserialize(serialized2);
-        DistributedColumn<int>* afterD3 = DistributedColumn<int>::deserialize(serialized3);
-
-        assert(dcser1->equals(afterD1));
-        assert(dcser3->equals(afterD3));
-        assert(dcser1->equals(dcser2));
-        assert(afterD1->equals(afterD2));
-        assert(afterD3->equals(afterD2) == false);
-
-
-        delete(dcser1);
-        delete(dcser2);
-        delete(dcser3);
-        delete(serialized1);
-        delete(serialized2);
-        delete(serialized3);
-        delete(afterD1);
-        delete(afterD2);
-        delete(afterD3);
+        delete(ss0);
+        delete(ss1);
+        delete(dc0_after);
+        delete(dc1_after);
         
-        OK("DistributedColumn::deserialize<U>(serialized) -- passed.");
+        OK("DistributedColumn serialization and deserialization -- passed.");
         return true;
     }
 
@@ -265,8 +216,8 @@ public:
             && testGet()
             && testSize()
             && testClone()
-            //&& testSerialize()
-            && testDeserialize()
+            && testEquals()
+            && testSerialization()
             && testGetLocalChunks();
     }
 };

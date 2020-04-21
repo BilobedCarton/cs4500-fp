@@ -12,6 +12,7 @@
 #include "../utils/thread.h"
 #include "../utils/map.h"
 #include "../utils/args.h"
+#include "../utils/logger.h"
 #include "message.h"
 
 class MsgQue : public Object {
@@ -70,7 +71,7 @@ public:
         lock_.lock();
         Size_t* v_obj = new Size_t(v);
         Map::put(k, v_obj);
-        p("Registered node ").p(v).p(" as ").pln(k->c_str());
+        Logger::log_register(v, k->c_str());
         delete(v_obj);
         lock_.unlock();
     }
