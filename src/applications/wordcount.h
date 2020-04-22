@@ -26,7 +26,7 @@ public:
         }
         buf_[i_] = 0;
         String word(buf_ + wStart, i_ - wStart);
-        r.set(0, word);
+        r.set(0, &word);
         ++i_;
         skipWhitespace_();
     }
@@ -80,6 +80,32 @@ public:
     size_t end_ = 0;
     size_t i_ = 0;
     FILE * file_;
+};
+
+class Num : public Object {
+public:
+  int v;
+
+  Num() { v = 0; }
+};
+
+class SIMap : public Map {
+public:
+  SIMap(SIMap& map) {
+    SIMap* clone = map.clone();
+  }
+
+  Num* get(String& word) {
+    return dynamic_cast<Num*>(Map::get(&word));
+  }
+
+  void set(String& word, Num* num) {
+    Map::put(&word, num);
+  }
+
+  bool contains(String& word) {
+    return get(word) != nullptr;
+  }
 };
  
  

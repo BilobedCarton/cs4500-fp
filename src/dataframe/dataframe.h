@@ -14,6 +14,7 @@
 #include "schema.h"
 #include "column.h"
 #include "row.h"
+#include "visitor.h"
 
 /****************************************************************************
  * DataFrame::

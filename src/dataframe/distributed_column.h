@@ -11,11 +11,6 @@
 // page size divided by type size
 #define CHUNK_MEMORY 4096
 
-class DataFrame {
-public:
-    char* name_;
-};
-
 /**
  * @brief Metadata for a chunk, used for representing locally cached chunk
  * 
@@ -59,12 +54,12 @@ public:
         if(cached_chunk_ != nullptr) delete(cached_chunk_);
     }
 
-    String* build_key(size_t chunk_idx, DataFrame* df) {
+    String* build_key(size_t chunk_idx, String* name) {
         // build the key
         StrBuff buf;
-        if(df != nullptr) {
+        if(name != nullptr) {
             // we're owned by a df, so we want to have a name relative to it
-            buf.c(df->name_);
+            buf.c(name->c_str());
             buf.c("-c");
         } else {
             // we're not owned, so we are a standalone column
@@ -82,7 +77,7 @@ public:
         store_ = store;
     }
 
-    virtual void push_back(T val, DataFrame* df) { assert(false); }
+    virtual void push_back(T val, String* name) { assert(false); }
     virtual T get(size_t idx) { assert(false); return 0; }
     virtual size_t size() { assert(false); return 0; }
     virtual PrimitiveArray<T>* get_local_chunks_primitive(size_t node) { assert(false); return nullptr; }
@@ -158,12 +153,12 @@ public:
     }
 
     /** Append a new value to this distributed column */
-    void push_back(T val, DataFrame* df) override {
+    void push_back(T val, String* name) override {
         last_chunk_->push_back(val);
         // if this chunk is full, put into KVStore and prepare a new chunk
         if(last_chunk_->count() == this->chunk_size_) {
             assert(this->store_ != nullptr);
-            String* kstr = this->build_key(this->keys_->count(), df);
+            String* kstr = this->build_key(this->keys_->count(), name);
             
             Key* k = new Key(kstr->c_str(), this->next_node_);
             this->keys_->append(k);
@@ -337,11 +332,11 @@ public:
     }
 
     /** Append a new value to this distributed column */
-    void push_back(String* val, DataFrame* df) override {
+    void push_back(String* val, String* name) override {
         last_chunk_->push_back(val);
         // if this chunk is full, put into KVStore and prepare a new chunk
         if(last_chunk_->count() == chunk_size_) {
-            String* kstr = build_key(keys_->count(), df);
+            String* kstr = build_key(keys_->count(), name);
             
             Key* k = new Key(kstr->c_str(), next_node_);
             keys_->append(k);
