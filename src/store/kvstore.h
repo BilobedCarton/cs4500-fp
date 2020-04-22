@@ -136,6 +136,23 @@ public:
             node->v_ = v->clone();
         }
     }
+
+    /**
+     * @brief removes the node with the given k
+     * 
+     * @param k - 
+     */
+    void remove(Key* k) {
+        if(next_ == nullptr) return;
+        else if(next_->k_->equals(k)) {
+            KVStore_Node* node = next_;
+            next_ = node->next_;
+            delete(node);
+        }
+        else {
+            next_->remove(k);
+        }
+    }
 };
 
 class KVStore; // forward dec
@@ -363,6 +380,26 @@ public:
         }
         return this;
     }
+
+    /**
+     * @brief removes the kv pair with the given key
+     * should only be used locally
+     * 
+     * @param k - the key
+     */
+    void remove(Key* k) {
+        assert(k->idx_ == idx_);
+        size_t pos = get_position(k);
+        if(nodes_[pos] == nullptr) return;
+        if(nodes_[pos]->k_->equals(k)) {
+            KVStore_Node* node = nodes_[pos];
+            nodes_[pos] = node->next_;
+            delete(node);
+        }
+        else {
+            nodes_[pos]->remove(k);
+        }
+    }
 };
 
 void NetworkListener::handleGet(Get* g)  {
@@ -392,7 +429,6 @@ void NetworkListener::run() {
                 break;
             case MsgType::Put:
                 store_->put(p->k_, p->v_);
-                delete(p);
                 break;
             case MsgType::Status:
                 if(s_ != nullptr) { cons_.notify_all(); prod_.wait(); }// Wait until s_ consumed
@@ -405,6 +441,7 @@ void NetworkListener::run() {
             case MsgType::Fail:
                 // wait, and then resend the get
                 fail_count_ += 1;
+                pln(fail_count_);
                 sleep(fail_count_);
                 send = new Get(f->k_);
                 send->sender_ = store_->idx_;
@@ -414,5 +451,6 @@ void NetworkListener::run() {
                 assert(false);
                 break;
         }
+        delete(m);
     }
 }

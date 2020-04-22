@@ -177,6 +177,7 @@ public:
             nodes_[msg->sender_].address.sin_family = AF_INET;
             nodes_[msg->sender_].address.sin_addr = msg->client.sin_addr;
             nodes_[msg->sender_].address.sin_port = htons(msg->port);
+            delete(msg);
         }
         size_t* ports = new size_t[num_nodes - 1];
         String** addresses = new String*[num_nodes - 1];
@@ -262,6 +263,7 @@ public:
         SerialString* ss = msg->serialize();
         send(conn, &ss->size_, sizeof(size_t), 0);
         send(conn, ss->data_, ss->size_, 0);
+        delete(ss);
         delete(msg);
     }
 

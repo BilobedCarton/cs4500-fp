@@ -6,20 +6,20 @@ clean-temp:
 	rm -r ./tests/testDistributedColumn.bin ./tests/testDistributedColumn.bin.dSYM
 
 build-demo:
-	g++ -o pseudo_demo -Wall -std=c++17 ./src/applications/pseudo_demo.cpp
-	g++ -o networked_demo -Wall -std=c++17 ./src/applications/networked_demo.cpp
+	g++ -o pseudo_demo -Wall -std=c++17 -g ./src/applications/pseudo_demo.cpp
+	g++ -o networked_demo -Wall -std=c++17 -g ./src/applications/networked_demo.cpp
 
 run-pseudo-demo:
 	./pseudo_demo
 
 net-demo-0:
-	./networked_demo -nn 3 -p 1025 -idx 0
+	./networked_demo -nn 3 -p 8080 -idx 0
 
 net-demo-1:
-	./networked_demo -nn 3 -p 1026 -idx 1 -sp 1025 -sa 0.0.0.0
+	./networked_demo -nn 3 -p 8081 -idx 1 -sp 8080 -sa 0.0.0.0
 
 net-demo-2:
-	./networked_demo -nn 3 -p 1027 -idx 2 -sp 1025 -sa 0.0.0.0
+	./networked_demo -nn 3 -p 8082 -idx 2 -sp 8080 -sa 0.0.0.0
 
 clean-demo:
 	rm pseudo_demo networked_demo

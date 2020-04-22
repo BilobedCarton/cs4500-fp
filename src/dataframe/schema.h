@@ -13,12 +13,14 @@
  */
 class Schema : public SerializableObject {
 public:
+    String* name; // owned
     size_t ncol;
     size_t nrow;
     char* col_types; // owned
 
     /** Copying constructor */
     Schema(Schema& from) {
+        name = new String(*from.name);
         ncol = from.ncol;
         nrow = from.nrow;
         col_types = duplicate(from.col_types);
@@ -26,6 +28,7 @@ public:
 
     /** Create an empty schema **/
     Schema() {
+        name = new String("standaloneDF");
         ncol = 0;
         nrow = 0;
         col_types = new char[1];
@@ -37,9 +40,16 @@ public:
     * undefined behavior. The argument is external, a nullptr argument is
     * undefined. **/
     Schema(const char* types) {
+        name = new String("standaloneDF");
         col_types = duplicate(types);
         ncol = strlen(col_types);
         nrow = 0;
+    }
+
+    
+    Schema(const char* types, Key* k) : Schema(types) {
+        delete(name);
+        name = new String(k->name_);
     }
 
     ~Schema() {
@@ -68,6 +78,36 @@ public:
         return col_types[idx];
     }
 
+    /** get the name of this dataframe **/
+    String* get_name() {
+        return name;
+    }
+
+    /**
+     * @brief Constructs a char* to be used as the given column's key
+     * 
+     * @param idx - the index of the column
+     * @return char* - the key to use for that column
+     */
+    char* build_col_key(size_t idx) {
+        StrBuff buf;
+
+        // use our name
+        buf.c(name->c_str());
+        buf.c("-c");
+
+        // use the column's index
+        char* idx_str = to_str<size_t>(idx);
+        buf.c(idx_str);
+        delete[](idx_str);
+
+        // grab, duplicate, delete, and return
+        String* str = buf.get();
+        char* key = duplicate(str->c_str());
+        delete(str);
+        return key;
+    }
+
     /** The number of columns */
     size_t width() {
         return ncol;
@@ -89,26 +129,41 @@ public:
     Object* clone() { return new Schema(*this); }
 
     SerialString* serialize() {
-        char* serial = new char[sizeof(size_t) + sizeof(size_t) + ncol];
+        SerialString* name_ss = name->serialize();
+
+        char* serial = new char[name_ss->size_ + sizeof(size_t) + sizeof(size_t) + ncol];
         size_t pos = 0;
 
+        // name
+        memcpy(&serial[pos], name_ss->data_, name_ss->size_);
+        pos += name_ss->size_;
+        delete(name_ss);
+
+        // ncol
         memcpy(&serial[pos], &ncol, sizeof(size_t));
         pos += sizeof(size_t);
 
+        // nrow
         memcpy(&serial[pos], &nrow, sizeof(size_t));
         pos += sizeof(size_t);
 
+        // col_types
         memcpy(&serial[pos], col_types, ncol);
+        pos += ncol;
         
-        SerialString* s = new SerialString(serial, sizeof(size_t) + sizeof(size_t) + ncol);
+        SerialString* s = new SerialString(serial, pos);
         delete[](serial);
         return s;
     }
 
     static Schema* deserialize(SerialString* serialized) {
+        String* name;
         size_t col;
         size_t row;
         size_t pos = 0;
+
+        name = String::deserialize(serialized);
+        pos += sizeof(size_t) + name->size();
         
         memcpy(&col, &serialized->data_[pos], sizeof(size_t));
         pos += sizeof(size_t);
@@ -122,6 +177,8 @@ public:
 
         Schema* s = new Schema(types);
         delete[](types);
+        delete(s->name);
+        s->name = name;
         s->nrow = row;
         return s;
     }

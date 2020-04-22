@@ -93,8 +93,9 @@ class Key : public SerializableObject {
         memcpy(&name_len, serial->data_, sizeof(size_t));
         pos += sizeof(size_t);
 
-        char* name = new char[name_len];
+        char* name = new char[name_len + 1];
         memcpy(name, serial->data_ + pos, name_len);
+        name[name_len] = 0;
         pos += name_len;
 
         size_t idx;

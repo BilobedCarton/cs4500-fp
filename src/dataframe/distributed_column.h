@@ -8,8 +8,8 @@
 #include "../store/value.h"
 #include "../store/kvstore.h"
 
-// page size divided by type size
-#define CHUNK_MEMORY 4096
+// 4kb * 125 = 0.5 mb
+#define CHUNK_MEMORY 4096 * 125
 
 /**
  * @brief Metadata for a chunk, used for representing locally cached chunk
@@ -197,7 +197,7 @@ public:
 
         // cache the chunk if we haven't already
         if(k->idx_ != this->store_->idx_) {
-            if(this->cached_chunk_ != nullptr) delete(this->cached_chunk_);
+            if(this->cached_chunk_ != nullptr) { this->store_->remove(this->cached_chunk_->key); delete(this->cached_chunk_); }
             this->cached_chunk_ = new ChunkMeta(new Key(k->name_, this->store_->idx_), chunk_idx);
             this->store_->put(this->cached_chunk_->key, chunkV);
         }

@@ -9,7 +9,7 @@ static bool SUPPRESS_LOGGING = false;
 
 class Logger : public Object {
 public:
-    static void log(char* msg) {
+    static void log(const char* msg) {
         if(SUPPRESS_LOGGING) return;
         Sys s;
         LOG_LOCK.lock();
@@ -54,7 +54,9 @@ public:
                 assert(false);
                 return;
         }
-        s.p(" and size ").pln(m->serialize()->size_);
+        SerialString* ss = m->serialize();
+        s.p(" and size ").pln(ss->size_);
+        delete(ss);
     }
 
     static void log_send(Message* m) {

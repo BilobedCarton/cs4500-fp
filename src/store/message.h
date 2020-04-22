@@ -374,6 +374,7 @@ public:
             memcpy(str + sizeof(size_t), addresses_[i]->c_str(), s);
 
             addresses_ss[i] = new SerialString(str, s + sizeof(size_t));
+            delete[](str);
             addresses_size += addresses_ss[i]->size_;
         }
         

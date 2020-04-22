@@ -1,6 +1,9 @@
 #include "demo.h"
 
 int main() {
+    args = new Args();
+    args->num_nodes = 3;
+
     PseudoNetwork* net = new PseudoNetwork(3);
 
     Demo* prod = new Demo(0, net);
@@ -11,16 +14,14 @@ int main() {
     NodeThread countThread(count);
     NodeThread sumThread(sum);
 
-    Sys s;
-
-    s.pln("Starting prod thread.");
+    Logger::log("Starting prod thread.");
     prodThread.start();
-    s.pln("Starting count thread.");
+    Logger::log("Starting count thread.");
     countThread.start();
-    s.pln("Starting sum thread.");
+    Logger::log("Starting sum thread.");
     sumThread.start();
 
-    s.pln("Joining threads");
+    Logger::log("Joining threads");
 
     prodThread.join();
     countThread.join();

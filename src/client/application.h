@@ -1,7 +1,6 @@
 #pragma once
 
 #include "../utils/object.h"
-#include "../dataframe/dataframe.h"
 #include "../store/key.h"
 #include "../store/kvstore.h"
 #include "../utils/thread.h"

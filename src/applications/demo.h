@@ -1,7 +1,7 @@
 #pragma once
 
 #include "../client/application.h"
-#include "../dataframe/dataframe.h"
+#include "../dataframe/distributed_dataframe.h"
 #include "../store/key.h"
 
 class Demo : public Application {
@@ -25,25 +25,25 @@ public:
     double* vals = new double[SZ];
     double sum = 0;
     for (size_t i = 0; i < SZ; ++i) sum += vals[i] = i;
-    delete DataFrame::fromArray(main, &kv, SZ, vals);
-    delete DataFrame::fromScalar(check, &kv, sum);
-    pln("Producer done.");
+    delete DistributedDataFrame::fromArray(main, &kv, SZ, vals);
+    delete DistributedDataFrame::fromScalar(check, &kv, sum);
+    Logger::log("Producer done.");
   }
  
   void counter() {
-    DataFrame* v = DataFrame::deserialize(kv.waitAndGet(main)->serialized());
-    pln("Counter got frame.");
+    DistributedDataFrame* v = DistributedDataFrame::deserialize(kv.waitAndGet(main)->serialized(), &kv);
+    Logger::log("Counter got frame.");
     double sum = 0;
     for (size_t i = 0; i < 100*1000; ++i) sum += v->get_double(0,i);
-    p("The sum is  ").pln(sum);
-    delete DataFrame::fromScalar(verify, &kv, sum);
-    pln("Counter done.");
+    p("The sum is  ").pln(sum); // TODO: use logger
+    delete DistributedDataFrame::fromScalar(verify, &kv, sum);
+    Logger::log("Counter done.");
   }
  
   void summarizer() {
-    DataFrame* result = DataFrame::deserialize(kv.waitAndGet(verify)->serialized());
-    DataFrame* expected = DataFrame::deserialize(kv.waitAndGet(check)->serialized());
-    pln(expected->get_double(0,0)==result->get_double(0,0) ? "SUCCESS":"FAILURE");
-    pln("Summarizer done.");
+    DistributedDataFrame* result = DistributedDataFrame::deserialize(kv.waitAndGet(verify)->serialized(), &kv);
+    DistributedDataFrame* expected = DistributedDataFrame::deserialize(kv.waitAndGet(check)->serialized(), &kv);
+    Logger::log(expected->get_double(0,0)==result->get_double(0,0) ? "SUCCESS":"FAILURE");
+    Logger::log("Summarizer done.");
   }
 };

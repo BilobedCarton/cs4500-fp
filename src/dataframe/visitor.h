@@ -2,6 +2,10 @@
 
 #include "row.h"
 
+class Visitor {
+
+};
+
 /*******************************************************************************
  *  Rower::
  *  An interface for iterating through each row of a data frame. The intent
