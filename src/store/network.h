@@ -163,6 +163,8 @@ public:
     void server_init(unsigned idx, unsigned port, size_t num_nodes) {
         this_node_ = idx;
         init_sock_(port);
+
+        // set up node list
         nodes_ = new NodeInfo[num_nodes];
         for (size_t i = 0; i < num_nodes; i++)
         {
@@ -170,6 +172,8 @@ public:
         }
         nodes_[0].address = ip_;
         nodes_[0].id = 0;
+
+        // register all nodes
         for (size_t i = 1; i < num_nodes; i++)
         {
             Register* msg = dynamic_cast<Register*>(receive_message());
@@ -179,6 +183,8 @@ public:
             nodes_[msg->sender_].address.sin_port = htons(msg->port);
             delete(msg);
         }
+
+        // set up info for directories
         size_t* ports = new size_t[num_nodes - 1];
         String** addresses = new String*[num_nodes - 1];
         for (size_t i = 0; i < num_nodes - 1; i++)
@@ -186,6 +192,8 @@ public:
             ports[i] = ntohs(nodes_[i + 1].address.sin_port);
             addresses[i] = new String(inet_ntoa(nodes_[i + 1].address.sin_addr));
         }
+
+        // send out directories
         for (size_t i = 0; i < num_nodes; i++)
         {
             Directory* ipd = new Directory(num_nodes - 1, ports, addresses);
@@ -197,20 +205,26 @@ public:
     void client_init(unsigned idx, unsigned port, char* server_adr, unsigned server_port, size_t num_nodes) {
         this_node_ = idx;
         init_sock_(port);
+
+        // set up node list
         nodes_ = new NodeInfo[1];
         nodes_[0].id = 0;
         nodes_[0].address.sin_family = AF_INET;
         nodes_[0].address.sin_port = htons(server_port);
+
         if(inet_pton(AF_INET, server_adr, &nodes_[0].address.sin_addr) <= 0) assert(false && "Invalid server IP address format");
         
+        // set up ip
         char* ip_arr = new char[INET_ADDRSTRLEN + 1];
         ip_arr[INET_ADDRSTRLEN] = '\0';
         inet_ntop(AF_INET, &ip_.sin_addr, ip_arr, INET_ADDRSTRLEN);
         String* ip = new String(ip_arr);
 
+        // register with server
         Register* msg = new Register(*ip, port);
         send_message(msg);
 
+        // handle directory
         Directory* ipd = dynamic_cast<Directory*>(receive_message());
         NodeInfo* nodes = new NodeInfo[num_nodes];
         nodes[0] = nodes_[0];
@@ -233,10 +247,13 @@ public:
         assert((sock_ = socket(AF_INET, SOCK_STREAM, 0)) >= 0);
         int opt = 1;
         assert(setsockopt(sock_, SOL_SOCKET, SO_REUSEADDR, /* | SO_REUSEPORT */ &opt, sizeof(opt)) == 0);
+
+        // set up ip
         ip_.sin_family = AF_INET;
         ip_.sin_addr.s_addr = INADDR_ANY;
         ip_.sin_port = htons(port);
         p("Using address: ").pln(inet_ntoa(ip_.sin_addr));
+
         if(bind(sock_, (sockaddr*)&ip_, sizeof(sockaddr)) < 0) {
             p("Bind failed: errno - ").pln(errno);
             assert(false);
@@ -253,12 +270,14 @@ public:
     void send_message(Message* msg) {
         msg->sender_ = index();
         NodeInfo& tgt = nodes_[msg->target_];
+
         int conn = socket(AF_INET, SOCK_STREAM, 0);
         assert(conn >= 0 && "Unable to create client socket");
         if(connect(conn, (sockaddr*)&tgt.address, sizeof(sockaddr)) < 0) {
             perror("Unable to connect to remote node");
             assert(false);
         } 
+
         Logger::log_send(msg);
         SerialString* ss = msg->serialize();
         send(conn, &ss->size_, sizeof(size_t), 0);

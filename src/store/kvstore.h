@@ -176,6 +176,7 @@ public:
     Status* await_status() {
         //prod_.notify_all(); // let producer know we need a status
         if(s_ == nullptr) { prod_.notify_all(); cons_.wait(); } // wait until s_ available
+        sleep(fail_count_);
         fail_count_ = 0;
         Status* s = s_;
         s_ = nullptr;
@@ -410,6 +411,7 @@ void NetworkListener::handleGet(Get* g)  {
     m->sender_ = store_->idx_;
     m->target_ = g->sender_;
     store_->network_->send_message(m);
+    delete(g);
 }
 
 void NetworkListener::run() {
@@ -429,6 +431,7 @@ void NetworkListener::run() {
                 break;
             case MsgType::Put:
                 store_->put(p->k_, p->v_);
+                delete(p);
                 break;
             case MsgType::Status:
                 if(s_ != nullptr) { cons_.notify_all(); prod_.wait(); }// Wait until s_ consumed
@@ -441,16 +444,15 @@ void NetworkListener::run() {
             case MsgType::Fail:
                 // wait, and then resend the get
                 fail_count_ += 1;
-                pln(fail_count_);
                 sleep(fail_count_);
                 send = new Get(f->k_);
                 send->sender_ = store_->idx_;
                 store_->network_->send_message(send);
+                delete(f);
                 break;
             default:
                 assert(false);
                 break;
         }
-        delete(m);
     }
 }

@@ -35,7 +35,7 @@ public:
     Logger::log("Counter got frame.");
     double sum = 0;
     for (size_t i = 0; i < 100*1000; ++i) sum += v->get_double(0,i);
-    p("The sum is  ").pln(sum); // TODO: use logger
+    p("The sum is  ").pln(sum);
     delete DistributedDataFrame::fromScalar(verify, &kv, sum);
     Logger::log("Counter done.");
   }
