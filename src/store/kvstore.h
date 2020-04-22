@@ -176,7 +176,6 @@ public:
     Status* await_status() {
         //prod_.notify_all(); // let producer know we need a status
         if(s_ == nullptr) { prod_.notify_all(); cons_.wait(); } // wait until s_ available
-        sleep(fail_count_);
         fail_count_ = 0;
         Status* s = s_;
         s_ = nullptr;
@@ -444,7 +443,7 @@ void NetworkListener::run() {
             case MsgType::Fail:
                 // wait, and then resend the get
                 fail_count_ += 1;
-                sleep(fail_count_);
+                sleep(fail_count_ * 1000);
                 send = new Get(f->k_);
                 send->sender_ = store_->idx_;
                 store_->network_->send_message(send);

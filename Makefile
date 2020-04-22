@@ -25,7 +25,7 @@ clean-demo:
 	rm pseudo_demo networked_demo
 
 valgrind:
-	valgrind --leak-check=yes --track-origins=yes ./main.cpp
+	valgrind --leak-check=yes --track-origins=yes ./pseudo_demo.cpp
 
 test: build-tests run-tests clean-tests
 

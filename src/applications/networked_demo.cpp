@@ -1,3 +1,5 @@
+#include <iostream>
+
 #include "demo.h"
 #include "../utils/args.h"
 
@@ -11,7 +13,9 @@ int main(int argc, char** argv) {
     //d.kv.network_->register_node(args->idx);
     d.p("Starting node: ").pln(d.idx_);
     d.run_();
-    while(true) {
-
-    }
+    
+    std::cout << "Enter anything to exit.";
+    int n;
+    std::cin >> n;
+    delete(net);
 }
