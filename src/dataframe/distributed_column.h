@@ -199,8 +199,6 @@ public:
         //  grab the value from the store
         assert(k != nullptr);
         Value* chunkV = this->store_->get(k);
-        PrimitiveArrayChunk<T>* chunk = PrimitiveArrayChunk<T>::deserialize(chunkV->serialized());
-        assert(chunk != nullptr);
 
         // cache the chunk if we haven't already
         if(k->idx_ != this->store_->idx_) {
@@ -209,9 +207,8 @@ public:
             this->store_->put(this->cached_chunk_->key, chunkV);
         }
         
-        T v = chunk->get(idx_in_chunk);
+        T v = PrimitiveArrayChunk<T>::quick_deserialize(chunkV->serialized(), idx_in_chunk);
         delete(chunkV);
-        delete(chunk);
         return v;
     }
 
@@ -380,8 +377,6 @@ public:
         //  grab the value from the store
         assert(k != nullptr);
         Value* chunkV = store_->get(k);
-        StringArrayChunk* chunk = StringArrayChunk::deserialize(chunkV->serialized());
-        assert(chunk != nullptr);
 
         // cache the chunk if we haven't already
         if(k->idx_ != store_->idx_) {
@@ -390,9 +385,9 @@ public:
             store_->put(cached_chunk_->key, chunkV);
         }
         
-        String* v = chunk->get(idx_in_chunk)->clone();
+        // use quick deserialize because we are grabbing a single value
+        String* v = StringArrayChunk::quick_deserialize(chunkV->serialized(), idx_in_chunk);
         delete(chunkV);
-        delete(chunk);
         return v;
     }
 

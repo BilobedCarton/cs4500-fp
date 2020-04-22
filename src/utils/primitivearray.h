@@ -106,6 +106,13 @@ public:
 
         return chunk;
     }
+
+    static T quick_deserialize(SerialString* serialized, size_t idx) {
+        // skip capacity, size, and elements before idx
+        size_t pos = sizeof(size_t) + sizeof(size_t) + sizeof(T) * idx;
+
+        return ((T*)(serialized->data_ + pos))[0];
+    }
 };
 
 template <class T>
@@ -167,9 +174,10 @@ public:
     }
 
     virtual void set(size_t idx, T v) {
+        if(idx == count()) { push_back(v); return; }
         size_t idx_in_chunk = idx % chunk_size_;
         size_t chunk = (idx - idx_in_chunk) / chunk_size_;
-        assert(chunk < chunks_);
+        assert(chunk <= chunks_);
         data_[chunk]->set(idx_in_chunk, v);
     }
 
@@ -210,7 +218,7 @@ public:
         for (size_t i = 0; i < chunks_; i++) {
             SerialString* serialized_chunk = data_[i]->serialize();
             memcpy(&serial[pos], serialized_chunk->data_, serialized_chunk->size_);
-            pos+= serialized_chunk->size_;
+            pos += serialized_chunk->size_;
             delete(serialized_chunk);
         }
 
@@ -342,16 +350,39 @@ public:
         {
             SerialString* sub_ss = new SerialString(serialized->data_ + pos, serialized->size_ - pos);
             String* str = String::deserialize(sub_ss);
-            SerialString* str_ss = str->serialize();
-            pos += str_ss->size_;
+            pos += str->size() + sizeof(size_t);
 
             chunk->set(i, str);
             delete(str);
             delete(sub_ss);
-            delete(str_ss);
         }
 
         return chunk;
+    }
+
+    static String* quick_deserialize(SerialString* serialized, size_t idx) {
+        size_t pos = 0;
+
+        // skip capacity
+        pos += sizeof(size_t);
+        
+        // size
+        size_t sz;
+        memcpy(&sz, &serialized->data_[pos], sizeof(size_t));
+        pos += sizeof(size_t);
+
+        // jump through data until we reach the index
+        size_t str_sz;
+        while(idx > 0) {
+            str_sz = ((size_t*)&serialized->data_[pos])[0];
+            pos += str_sz + sizeof(size_t);
+            idx--;
+        }
+        
+        // grab the string
+        str_sz = ((size_t*)&serialized->data_[pos])[0];
+        pos += sizeof(size_t);
+        return new String(&serialized->data_[pos], str_sz);
     }
 };
 
@@ -413,6 +444,7 @@ public:
     }
 
     virtual void set(size_t idx, String* v) {
+        if(idx == count()) { push_back(v); return; }
         size_t idx_in_chunk = idx % chunk_size_;
         size_t chunk = (idx - idx_in_chunk) / chunk_size_;
         assert(chunk < chunks_);

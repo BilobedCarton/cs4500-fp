@@ -171,12 +171,8 @@ public:
 
         for (size_t i = 0; i < (3 * 4096) / sizeof(int) + 1; i++)
         {
-            assert(dc0->get(i) == clone->get(i));
-        }
-
-        for (size_t i = 0; i < (3 * 4096) / sizeof(String*) + 1; i++)
-        {
-            assert(dc2->get(i)->equals(cloneStr->get(i)));
+            if(i % sizeof(int) == 0) assert(dc0->get(i / sizeof(int)) == clone->get(i / sizeof(int)));
+            if(i % sizeof(String*) == 0) assert(dc2->get(i / sizeof(String*))->equals(cloneStr->get(i / sizeof(String*))));
         }
         
         delete(clone);
