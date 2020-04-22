@@ -100,7 +100,9 @@ public:
     }
 
     static String* deserialize(SerialString* serial) {
-        return new String(serial->data_ + sizeof(size_t));
+        size_t sz;
+        memcpy(&sz, serial->data_, sizeof(size_t));
+        return new String(serial->data_ + sizeof(size_t), sz);
     }
  };
 

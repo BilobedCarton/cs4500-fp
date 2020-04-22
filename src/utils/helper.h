@@ -35,11 +35,13 @@ class Sys {
 
   // Copying strings
   char* duplicate(const char* s) {
+    if(s == nullptr) pln("help!");
     char* res = new char[strlen(s) + 1];
     strcpy(res, s);
     return res;
   }
   char* duplicate(char* s) {
+    if(s == nullptr) pln("help!");
     char* res = new char[strlen(s) + 1];
     strcpy(res, s);
     return res;

@@ -5,12 +5,16 @@
 #include "../utils/primitivearray.h"
 #include "../utils/args.h"
 
-#include "dataframe.h"
 #include "../store/value.h"
 #include "../store/kvstore.h"
 
 // page size divided by type size
 #define CHUNK_MEMORY 4096
+
+class DataFrame {
+public:
+    char* name_;
+};
 
 /**
  * @brief Metadata for a chunk, used for representing locally cached chunk
@@ -32,159 +36,58 @@ public:
 };
 
 template<class T>
-/** 
- * A DistributedColumn is a collection of Keys which point to data belonging to this column.
- * When data is added to the column, it will be added to the currently cached chunk.
- * Full chunks are put into the KVStore and become a Key in this column's list of keys.
-*/
-class DistributedColumn : public SerializableObject {
+class Column : public SerializableObject {
 public:
     size_t idx_; // which column are we
     KVStore* store_; // not owned
     Array* keys_; // owned
     size_t chunk_size_; // how many elements are stored in a chunk
     ChunkMeta* cached_chunk_; // owned - the chunk most recently accessed, only exists if we have a store
-    PrimitiveArrayChunk<T>* last_chunk_; // owned - the chunk currently being filled by push_back
     size_t next_node_; // where the next chunk will be shipped when completed
 
-    /** Create an empty DistributedColumn representing the provided index */
-    DistributedColumn(size_t idx) {
+    Column(size_t idx) {
         idx_ = idx;
+        store_ = nullptr;
         keys_ = new Array();
         chunk_size_ = CHUNK_MEMORY / sizeof(T);
         cached_chunk_ = nullptr;
-        last_chunk_ = new PrimitiveArrayChunk<T>(chunk_size_);
         next_node_ = 0;
     }
 
-    ~DistributedColumn() {
+    ~Column() {
         delete(keys_);
-        delete(last_chunk_);
+        if(cached_chunk_ != nullptr) delete(cached_chunk_);
     }
 
-    /** Append a new value to this distributed column */
-    virtual void push_back(T val, DataFrame* df) {
-        last_chunk_->push_back(val);
-        // if this chunk is full, put into KVStore and prepare a new chunk
-        if(last_chunk_->count() == chunk_size_) {
-            
-            // build the key
-            StrBuff buf;
-            if(df != nullptr) {
-                // we're owned by a df, so we want to have a name relative to it
-                buf.c(df->name_);
-                buf.c("-c");
-            } else {
-                // we're not owned, so we are a standalone column
-                buf.c("standalone-c");
-            }
-            buf.c(to_str<size_t>(idx_));
-            buf.c("-cc");
-            buf.c(to_str<size_t>(keys_->count()));
-
-            // add the key, put the value, and update next_node_ and last_chunk_
-            String* kstr = buf.get();
-            Key* k = new Key(kstr->c_str(), next_node_);
-            keys_->append(k);
-
-            // maybe want to check if our key is already in use?
-            Value v(last_chunk_);
-            store_->put(k, &v);
-
-            delete(last_chunk_);
-            delete(kstr);
-            next_node_ = (next_node_ + 1) % args->num_nodes;
-            last_chunk_ = new PrimitiveArrayChunk<T>(chunk_size_);
-        }
-    }
-
-    virtual T get(size_t idx) {
-        size_t chunk_idx = idx / chunk_size_;
-        size_t idx_in_chunk = idx - (chunk_idx * chunk_size_);
-
-        // check if pulling from last chunk
-        if(chunk_idx == keys_->count()) return last_chunk_->get(idx_in_chunk);
-
-        assert(store_ != nullptr); // at this point we need a store
-        Key* k;
-        if(cached_chunk_ != nullptr && cached_chunk_->chunk == chunk_idx) {
-            // grab key to cached chunk
-            k = cached_chunk_->key;
+    String* build_key(size_t chunk_idx, DataFrame* df) {
+        // build the key
+        StrBuff buf;
+        if(df != nullptr) {
+            // we're owned by a df, so we want to have a name relative to it
+            buf.c(df->name_);
+            buf.c("-c");
         } else {
-            // grab key to external chunk
-            k = dynamic_cast<Key *>(keys_->get(chunk_idx));
+            // we're not owned, so we are a standalone column
+            buf.c("standalone-c");
         }
+        buf.c(to_str<size_t>(idx_));
+        buf.c("-cc");
+        buf.c(to_str<size_t>(chunk_idx));
 
-        //  grab the value from the store
-        assert(k != nullptr);
-        Value* chunkV = store_->get(k);
-        PrimitiveArrayChunk<T>* chunk = PrimitiveArrayChunk<T>::deserialize(chunkV->serialized());
-        assert(chunk != nullptr);
-
-        // cache the chunk if we haven't already
-        if(k->idx_ != store_->idx_) {
-            if(cached_chunk_ != nullptr) delete(cached_chunk_);
-            cached_chunk_ = new ChunkMeta(new Key(k->name_, store_->idx_), chunk_idx);
-            store_->put(cached_chunk_->key, chunkV);
-        }
-        
-        T v = chunk->get(idx_in_chunk);
-        delete(chunkV);
-        delete(chunk);
-        return v;
+        // add the key, put the value, and update next_node_ and last_chunk_
+        return buf.get();
     }
 
-    size_t size() {
-        return (keys_->count() * chunk_size_) + last_chunk_->count();
+    void set_store(KVStore* store) {
+        store_ = store;
     }
 
-    /** Gets all chunks local to the given node **/
-    PrimitiveArray<T>* get_local_chunks(size_t node) {
-        Array local_keys;
-        // select all keys with idx same as given value
-        for (size_t i = 0; i < keys_->count(); i++)
-        {
-            Key* k = dynamic_cast<Key *>(keys_->get(i));
-            if(k->idx_ == node) local_keys.append(k);
-        }
-        // build a super array to hold all the chunks
-        PrimitiveArray<T>* arr = new PrimitiveArray<T>(chunk_size_, local_keys.count() + 1);
-        for (; arr->chunks_ < local_keys.count(); arr->chunks_++)
-        {
-            Value* v = store_->get(dynamic_cast<Key *>(local_keys.get(arr->chunks_)));
-            arr->data_[arr->chunks_] = PrimitiveArrayChunk<T>::deserialize(v->serialized());
-            delete(v);
-        }
-        // grab last_chunk_ if we're the 0 node.
-        if(node == 0) arr->data_[arr->chunks_++] = last_chunk_->clone();
-
-        return arr;
-    }
-
-    /** Return a copy of the object; nullptr is considered an error */
-    virtual Object* clone() { 
-        DistributedColumn<T>* clone = new DistributedColumn<T>(idx_);
-        clone->store_ = store_;
-        delete(clone->keys_);
-        clone->keys_ = new Array(keys_);
-        for (size_t i = 0; i < last_chunk_->count(); i++)
-        {
-            clone->last_chunk_->push_back(last_chunk_->get(i));
-        }
-        clone->next_node_ = next_node_;
-        
-        return clone;
-    }
-
-    virtual bool equals(Object* other) {
-        DistributedColumn<T>* cast = dynamic_cast<DistributedColumn<T>*>(other);
-        if(cast == nullptr) return false;
-        if(idx_ != cast->idx_) return false;
-        if(chunk_size_ != cast->chunk_size_) return false;
-        if(next_node_ != cast->next_node_) return false;
-        if(!keys_->equals(cast->keys_)) return false;
-        return last_chunk_->equals(cast->last_chunk_);
-    }
+    virtual void push_back(T val, DataFrame* df) { assert(false); }
+    virtual T get(size_t idx) { assert(false); return 0; }
+    virtual size_t size() { assert(false); return 0; }
+    virtual PrimitiveArray<T>* get_local_chunks_primitive(size_t node) { assert(false); return nullptr; }
+    virtual StringArray* get_local_chunks_string(size_t node) { assert(false); return nullptr; }
+    virtual SerialString* serialize_last_chunk() { assert(false); return nullptr; }
 
     /** Return a serialized version of this column's contents */
     SerialString* serialize() {
@@ -196,7 +99,7 @@ public:
             keys_size += keys_serials[i]->size_;
         }
 
-        SerialString* last_chunk_serial = last_chunk_->serialize();
+        SerialString* last_chunk_serial = serialize_last_chunk();
 
         size_t sz = sizeof(size_t) + sizeof(size_t) + keys_size + last_chunk_serial->size_ + sizeof(size_t);
         char* arr = new char[sz];
@@ -233,9 +136,139 @@ public:
         delete[](arr);
         return serial;
     }
+};
 
-    void set_store(KVStore* store) {
-        store_ = store;
+template<class T>
+/** 
+ * A DistributedColumn is a collection of Keys which point to data belonging to this column.
+ * When data is added to the column, it will be added to the currently cached chunk.
+ * Full chunks are put into the KVStore and become a Key in this column's list of keys.
+*/
+class DistributedColumn : public Column<T> {
+public:
+    PrimitiveArrayChunk<T>* last_chunk_; // owned - the chunk currently being filled by push_back
+
+    /** Create an empty DistributedColumn representing the provided index */
+    DistributedColumn(size_t idx) : Column<T>(idx) {
+        last_chunk_ = new PrimitiveArrayChunk<T>(this->chunk_size_);
+    }
+
+    ~DistributedColumn() {
+        delete(last_chunk_);
+    }
+
+    /** Append a new value to this distributed column */
+    void push_back(T val, DataFrame* df) override {
+        last_chunk_->push_back(val);
+        // if this chunk is full, put into KVStore and prepare a new chunk
+        if(last_chunk_->count() == this->chunk_size_) {
+            assert(this->store_ != nullptr);
+            String* kstr = this->build_key(this->keys_->count(), df);
+            
+            Key* k = new Key(kstr->c_str(), this->next_node_);
+            this->keys_->append(k);
+
+            // maybe want to check if our key is already in use?
+            Value v(last_chunk_);
+            this->store_->put(k, &v);
+
+            delete(kstr);
+            this->next_node_ = (this->next_node_ + 1) % args->num_nodes;
+            delete(last_chunk_);
+            last_chunk_ = new PrimitiveArrayChunk<T>(this->chunk_size_);
+        }
+    }
+
+    T get(size_t idx) override {
+        size_t chunk_idx = idx / this->chunk_size_;
+        size_t idx_in_chunk = idx - (chunk_idx * this->chunk_size_);
+
+        // check if pulling from last chunk
+        if(chunk_idx == this->keys_->count()) return last_chunk_->get(idx_in_chunk);
+
+        assert(this->store_ != nullptr); // at this point we need a store
+        Key* k;
+        if(this->cached_chunk_ != nullptr && this->cached_chunk_->chunk == chunk_idx) {
+            // grab key to cached chunk
+            k = this->cached_chunk_->key;
+        } else {
+            // grab key to external chunk
+            k = dynamic_cast<Key *>(this->keys_->get(chunk_idx));
+        }
+
+        //  grab the value from the store
+        assert(k != nullptr);
+        Value* chunkV = this->store_->get(k);
+        PrimitiveArrayChunk<T>* chunk = PrimitiveArrayChunk<T>::deserialize(chunkV->serialized());
+        assert(chunk != nullptr);
+
+        // cache the chunk if we haven't already
+        if(k->idx_ != this->store_->idx_) {
+            if(this->cached_chunk_ != nullptr) delete(this->cached_chunk_);
+            this->cached_chunk_ = new ChunkMeta(new Key(k->name_, this->store_->idx_), chunk_idx);
+            this->store_->put(this->cached_chunk_->key, chunkV);
+        }
+        
+        T v = chunk->get(idx_in_chunk);
+        delete(chunkV);
+        delete(chunk);
+        return v;
+    }
+
+    size_t size() override {
+        return (this->keys_->count() * this->chunk_size_) + last_chunk_->count();
+    }
+
+    /** Gets all chunks local to the given node **/
+    PrimitiveArray<T>* get_local_chunks_primitive(size_t node) override {
+        Array local_keys;
+        // select all keys with idx same as given value
+        for (size_t i = 0; i < this->keys_->count(); i++)
+        {
+            Key* k = dynamic_cast<Key *>(this->keys_->get(i));
+            if(k->idx_ == node) local_keys.append(k);
+        }
+        // build a super array to hold all the chunks
+        PrimitiveArray<T>* arr = new PrimitiveArray<T>(this->chunk_size_, local_keys.count() + 1);
+        for (; arr->chunks_ < local_keys.count(); arr->chunks_++)
+        {
+            Value* v = this->store_->get(dynamic_cast<Key *>(local_keys.get(arr->chunks_)));
+            arr->data_[arr->chunks_] = PrimitiveArrayChunk<T>::deserialize(v->serialized());
+            delete(v);
+        }
+        // grab last_chunk_ if we're the 0 node.
+        if(node == 0) arr->data_[arr->chunks_++] = last_chunk_->clone();
+
+        return arr;
+    }
+    
+    SerialString* serialize_last_chunk() override {
+        return last_chunk_->serialize();
+    }
+
+    /** Return a copy of the object; nullptr is considered an error */
+    Object* clone() override { 
+        DistributedColumn<T>* clone = new DistributedColumn<T>(this->idx_);
+        clone->store_ = this->store_;
+        delete(clone->keys_);
+        clone->keys_ = new Array(this->keys_);
+        for (size_t i = 0; i < last_chunk_->count(); i++)
+        {
+            clone->last_chunk_->push_back(last_chunk_->get(i));
+        }
+        clone->next_node_ = this->next_node_;
+        
+        return clone;
+    }
+
+    bool equals(Object* other) override {
+        DistributedColumn<T>* cast = dynamic_cast<DistributedColumn<T>*>(other);
+        if(cast == nullptr) return false;
+        if(this->idx_ != cast->idx_) return false;
+        if(this->chunk_size_ != cast->chunk_size_) return false;
+        if(this->next_node_ != cast->next_node_) return false;
+        if(!this->keys_->equals(cast->keys_)) return false;
+        return last_chunk_->equals(cast->last_chunk_);
     }
 
     /** Deserialize the provided String into a DistributedColumn object */
@@ -289,40 +322,30 @@ public:
 };
 
 /** 
- * A DistributedStrColumn is a collection of Keys which point to String data belonging to this column.
+ * A DistributedStringColumn is a collection of Keys which point to string data belonging to this column.
  * When data is added to the column, it will be added to the currently cached chunk.
  * Full chunks are put into the KVStore and become a Key in this column's list of keys.
 */
-class DistributedStrColumn : public DistributedColumn<String *> {
+class DistributedStringColumn : public Column<String *> {
 public:
+    StringArrayChunk* last_chunk_; // owned - the chunk currently being filled by push_back
 
-    DistributedStrColumn(size_t idx) : DistributedColumn(idx) {
+    /** Create an empty DistributedColumn representing the provided index */
+    DistributedStringColumn(size_t idx) : Column(idx) {
+        last_chunk_ = new StringArrayChunk(chunk_size_);
+    }
+
+    ~DistributedStringColumn() {
         delete(last_chunk_);
-        last_chunk_ = new StringArrayChunk(chunk_size_); // use StringArrayChunk instead of generic to utilize String specific methods
     }
 
     /** Append a new value to this distributed column */
-    void push_back(String* val, DataFrame* df) {
+    void push_back(String* val, DataFrame* df) override {
         last_chunk_->push_back(val);
         // if this chunk is full, put into KVStore and prepare a new chunk
         if(last_chunk_->count() == chunk_size_) {
+            String* kstr = build_key(keys_->count(), df);
             
-            // build the key
-            StrBuff buf;
-            if(df != nullptr) {
-                // we're owned by a df, so we want to have a name relative to it
-                buf.c(df->name_);
-                buf.c("-c");
-            } else {
-                // we're not owned, so we are a standalone column
-                buf.c("standalone-c");
-            }
-            buf.c(to_str<size_t>(idx_));
-            buf.c("-cc");
-            buf.c(to_str<size_t>(keys_->count()));
-
-            // add the key, put the value, and update next_node_ and last_chunk_
-            String* kstr = buf.get();
             Key* k = new Key(kstr->c_str(), next_node_);
             keys_->append(k);
 
@@ -330,14 +353,14 @@ public:
             Value v(last_chunk_);
             store_->put(k, &v);
 
-            delete(last_chunk_);
             delete(kstr);
             next_node_ = (next_node_ + 1) % args->num_nodes;
+            delete(last_chunk_);
             last_chunk_ = new StringArrayChunk(chunk_size_);
         }
     }
 
-    String* get(size_t idx) {
+    String* get(size_t idx) override {
         size_t chunk_idx = idx / chunk_size_;
         size_t idx_in_chunk = idx - (chunk_idx * chunk_size_);
 
@@ -367,14 +390,18 @@ public:
             store_->put(cached_chunk_->key, chunkV);
         }
         
-        String* v = chunk->get(idx_in_chunk);
+        String* v = chunk->get(idx_in_chunk)->clone();
         delete(chunkV);
         delete(chunk);
         return v;
     }
 
+    size_t size() override {
+        return (keys_->count() * chunk_size_) + last_chunk_->count();
+    }
+
     /** Gets all chunks local to the given node **/
-    StringArray* get_local_chunks(size_t node) {
+    StringArray* get_local_chunks_string(size_t node) override {
         Array local_keys;
         // select all keys with idx same as given value
         for (size_t i = 0; i < keys_->count(); i++)
@@ -391,14 +418,18 @@ public:
             delete(v);
         }
         // grab last_chunk_ if we're the 0 node.
-        if(node == 0) arr->data_[arr->chunks_++] = dynamic_cast<StringArrayChunk*>(last_chunk_->clone());
+        if(node == 0) arr->data_[arr->chunks_++] = last_chunk_->clone();
 
         return arr;
     }
+    
+    SerialString* serialize_last_chunk() override {
+        return last_chunk_->serialize();
+    }
 
     /** Return a copy of the object; nullptr is considered an error */
-    Object* clone() { 
-        DistributedStrColumn* clone = new DistributedStrColumn(idx_);
+    Object* clone() override { 
+        DistributedStringColumn* clone = new DistributedStringColumn(idx_);
         clone->store_ = store_;
         delete(clone->keys_);
         clone->keys_ = new Array(keys_);
@@ -411,8 +442,18 @@ public:
         return clone;
     }
 
-    /** Deserialize the provided String into a DistributedStrColumn object */
-    static DistributedStrColumn* deserialize(SerialString* serialized) {
+    bool equals(Object* other) override {
+        DistributedStringColumn* cast = dynamic_cast<DistributedStringColumn*>(other);
+        if(cast == nullptr) return false;
+        if(idx_ != cast->idx_) return false;
+        if(chunk_size_ != cast->chunk_size_) return false;
+        if(next_node_ != cast->next_node_) return false;
+        if(!keys_->equals(cast->keys_)) return false;
+        return last_chunk_->equals(cast->last_chunk_);
+    }
+
+    /** Deserialize the provided String into a DistributedColumn object */
+    static DistributedStringColumn* deserialize(SerialString* serialized) {
         size_t pos = 0;
 
         // idx_
@@ -421,7 +462,7 @@ public:
         memcpy(&idx, serialized->data_ + pos, sizeof(size_t));
         pos += sizeof(size_t);
 
-        DistributedStrColumn* col = new DistributedStrColumn(idx);
+        DistributedStringColumn* col = new DistributedStringColumn(idx);
 
         // keys_
         size_t num_keys;
@@ -453,10 +494,10 @@ public:
         return col;
     }
 
-    static DistributedStrColumn* deserialize(SerialString* serialized, KVStore* store) {
-        DistributedStrColumn* col = DistributedStrColumn::deserialize(serialized);
+    /** Deserialized the provided string and set the store **/
+    static DistributedStringColumn* deserialize(SerialString* serialized, KVStore* store) {
+        DistributedStringColumn* col = DistributedStringColumn::deserialize(serialized);
         col->set_store(store);
         return col;
     }
-
 };

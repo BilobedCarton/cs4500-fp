@@ -12,69 +12,41 @@ template <class T>
 class PrimitiveArrayChunk : public Serializable {
 public:
     T* data_; // owned
-    bool* missing_; // owned
     size_t capacity_;
     size_t size_;
 
     PrimitiveArrayChunk(size_t capacity) {
         capacity_ = capacity;
         data_ = new T[capacity_];
-        missing_ = new bool[capacity_];
         size_ = 0;
     }
 
     PrimitiveArrayChunk(PrimitiveArrayChunk<T>* chunk) : PrimitiveArrayChunk(chunk->capacity_) {
         for (size_t i = 0; i < chunk->size_; i++)
         {
-            if(chunk->isMissing(i)) setMissing(i);
-            else set(i, chunk->get(i));
+            push_back(chunk->get(i));
         }
     }
 
     virtual ~PrimitiveArrayChunk() {
         delete[](data_);
-        delete[](missing_);
     }
 
-    size_t count() { return size_; } // counts missing
-
-    bool push_back_missing() {
-        if(size_ == capacity_) return false;
-        missing_[size_++] = true;
-        return true;
-    }
-
-    void setMissing(size_t idx) { 
-        assert(idx < capacity_);
-        while(size_ <= idx) {
-            assert(push_back_missing());
-        }
-        missing_[idx] = true; 
-    }
-
-    bool isMissing(size_t idx) { 
-        assert(idx < size_);
-        return missing_[idx]; 
-    }
+    size_t count() { return size_; }
 
     virtual bool push_back(T v) {
         if(size_ == capacity_) return false;
         data_[size_++] = v;
-        missing_[size_] = false;
         return true;
     }
 
     virtual void set(size_t idx, T v) {
-        assert(idx < capacity_);
-        while(size_ <= idx) {
-            assert(push_back_missing());
-        }
+        assert(idx < size_);
         data_[idx] = v;
-        missing_[idx] = false;
     }
 
     T get(size_t idx) {
-        assert(isMissing(idx) != true);
+        assert(idx < size_);
         return data_[idx];
     }
 
@@ -85,16 +57,13 @@ public:
         if(other->size_ != size_) return false;
         for (size_t i = 0; i < size_; i++)
         {
-            if(isMissing(i) != other->isMissing(i)) return false;
-            if(!isMissing(i)) {
-                if(get(i) != other->get(i)) return false;
-            }
+            if(get(i) != other->get(i)) return false;
         }
         return true;
     }
 
     SerialString* serialize() {
-        size_t size = sizeof(size_t) + sizeof(size_t) + (sizeof(T) * capacity_) + (sizeof(bool) * capacity_);
+        size_t size = sizeof(size_t) + sizeof(size_t) + (sizeof(T) * capacity_);
         char* serial = new char[size];
         size_t pos = 0;
         
@@ -109,10 +78,6 @@ public:
         // data
         memcpy(serial + pos, (void*)data_, sizeof(T) * capacity_);
         pos += sizeof(T) * capacity_;
-
-        // missing
-        memcpy(serial + pos, missing_, sizeof(bool) * capacity_);
-        pos += sizeof(bool) * capacity_;
 
         SerialString* s = new SerialString(serial, pos);
         delete[](serial);
@@ -138,9 +103,6 @@ public:
         // data
         memcpy(chunk->data_, serialized->data_ + pos, sizeof(T) * chunk->capacity_);
         pos += sizeof(T) * chunk->capacity_;
-
-        // missing
-        memcpy(chunk->missing_, serialized->data_ + pos, sizeof(bool) * chunk->capacity_);
 
         return chunk;
     }
@@ -178,7 +140,6 @@ public:
         delete[](data_);
     }
     
-    // counts missing as well
     virtual size_t count() {
         size_t count = 0;
         for (size_t i = 0; i < chunks_; i++)
@@ -199,36 +160,16 @@ public:
         data_[chunks_++] = new PrimitiveArrayChunk<T>(chunk_size_);
     }
 
-    virtual void push_back_missing() {
-        if(data_[chunks_ - 1]->push_back_missing()) return;
-        grow();
-        push_back_missing();
-    }
-
     virtual void push_back(T v) {
         if(data_[chunks_ - 1]->push_back(v)) return;
         grow();
         push_back(v);
     }
 
-    virtual void setMissing(size_t idx) {
-        size_t idx_in_chunk = idx % chunk_size_;
-        size_t chunk = (idx - idx_in_chunk) / chunk_size_;
-        while(chunks_ < chunk) { push_back_missing(); }
-        data_[chunk]->setMissing(idx_in_chunk);
-    }
-
-    virtual bool isMissing(size_t idx) {
-        size_t idx_in_chunk = idx % chunk_size_;
-        size_t chunk = (idx - idx_in_chunk) / chunk_size_;
-        assert(chunk < chunks_);
-        return data_[chunk]->isMissing(idx_in_chunk);
-    }
-
     virtual void set(size_t idx, T v) {
         size_t idx_in_chunk = idx % chunk_size_;
         size_t chunk = (idx - idx_in_chunk) / chunk_size_;
-        while(chunks_ < chunk) { push_back_missing(); }
+        assert(chunk < chunks_);
         data_[chunk]->set(idx_in_chunk, v);
     }
 
@@ -246,10 +187,7 @@ public:
         if(other->count() != count()) return false;
         for (size_t i = 0; i < count(); i++)
         {
-            if(isMissing(i) != other->isMissing(i)) return false;
-            if(!isMissing(i)) {
-                if(get(i) != other->get(i)) return false;
-            }
+            if(get(i) != other->get(i)) return false;
         }
         return true;
     }
@@ -317,21 +255,15 @@ public:
     StringArrayChunk(StringArrayChunk* chunk) : PrimitiveArrayChunk<String *>(chunk->capacity_) {
         for (size_t i = 0; i < chunk->size_; i++)
         {
-            if(chunk->isMissing(i)) setMissing(i);
-            else set(i, chunk->get(i));
+            push_back(chunk->get(i));
         }
     }
 
     // strings are owned
     ~StringArrayChunk() {
         for (size_t i = 0; i < size_; i++) {
-            if(!isMissing(i)) delete(data_[i]);
+            delete(data_[i]);
         }
-    }
-
-    void setMissing(size_t idx) {
-        if(idx < size_ && !isMissing(idx)) delete(data_[idx]);
-        PrimitiveArrayChunk<String *>::setMissing(idx);
     }
 
     bool push_back(String* v) {
@@ -347,10 +279,7 @@ public:
         if(other->size_ != size_) return false;
         for (size_t i = 0; i < size_; i++)
         {
-            if(isMissing(i) != other->isMissing(i)) return false;
-            if(!isMissing(i)) {
-                if(!get(i)->equals(other->get(i))) return false;
-            }
+            if(!get(i)->equals(other->get(i))) return false;
         }
         return true;
     }
@@ -363,45 +292,29 @@ public:
         size_t data_size = 0;
         for (size_t i = 0; i < size_; i++)
         {
-            char* d = "";
-            size_t sz;
-            if(isMissing(i)) {
-                sz = 0;
-            }
-            else {
-                Sys s;
-                d = s.duplicate(get(i)->c_str());
-                sz = strlen(d);
-            }
-            serial_data[i] = new SerialString(d, sz);
-            data_size += sz + sizeof(size_t);
+            serial_data[i] = get(i)->serialize();
+            data_size += serial_data[i]->size_;
         }
 
-        char* serial = new char[sizeof(size_t) + sizeof(size_t) + data_size + (sizeof(bool) * capacity_)];
+        char* serial = new char[sizeof(size_t) + sizeof(size_t) + data_size];
         size_t pos = 0;
         
         // capacity
-        memcpy(&serial[pos], &capacity_, sizeof(size_t));
+        memcpy(serial + pos, &capacity_, sizeof(size_t));
         pos += sizeof(size_t);
 
         // size
-        memcpy(&serial[pos], &size_, sizeof(size_t));
+        memcpy(serial + pos, &size_, sizeof(size_t));
         pos += sizeof(size_t);
 
         // data
         for (size_t i = 0; i < size_; i++)
         {
-            memcpy(&serial[pos], &serial_data[i]->size_, sizeof(size_t));
-            pos += sizeof(size_t);
             memcpy(&serial[pos], serial_data[i]->data_, serial_data[i]->size_);
             pos += serial_data[i]->size_;
             delete(serial_data[i]);
         }
         delete[](serial_data);
-
-        // missing
-        memcpy(&serial[pos], missing_, capacity_ * sizeof(bool));
-        pos += capacity_ * sizeof(bool);
 
         SerialString* s = new SerialString(serial, pos);
         delete[](serial);
@@ -427,25 +340,15 @@ public:
         // data
         for (size_t i = 0; i < chunk->size_; i++)
         {
-            size_t size;
-            memcpy(&size, &serialized->data_[pos], sizeof(size_t));
-            pos += sizeof(size_t);
+            SerialString* sub_ss = new SerialString(serialized->data_ + pos, serialized->size_ - pos);
+            String* str = String::deserialize(sub_ss);
+            SerialString* str_ss = str->serialize();
+            pos += str_ss->size_;
 
-            String* s = new String(&serialized->data_[pos], size);
-            pos += size;
-
-            chunk->set(i, s);
-            delete(s);
-        }        
-
-        // missing
-        memcpy(chunk->missing_, &serialized->data_[pos], sizeof(bool) * chunk->capacity_);
-        for (size_t i = 0; i < chunk->size_; i++)
-        {
-            if(chunk->isMissing(i)) {
-                delete(chunk->data_[i]);
-                chunk->data_[i] = nullptr;
-            }
+            chunk->set(i, str);
+            delete(str);
+            delete(sub_ss);
+            delete(str_ss);
         }
 
         return chunk;
@@ -483,7 +386,6 @@ public:
         delete[](data_);
     }
     
-    // counts missing as well
     virtual size_t count() {
         size_t count = 0;
         for (size_t i = 0; i < chunks_; i++)
@@ -504,36 +406,16 @@ public:
         data_[chunks_++] = new StringArrayChunk(chunk_size_);
     }
 
-    virtual void push_back_missing() {
-        if(data_[chunks_ - 1]->push_back_missing()) return;
-        grow();
-        push_back_missing();
-    }
-
     virtual void push_back(String* v) {
         if(data_[chunks_ - 1]->push_back(v)) return;
         grow();
         push_back(v);
     }
 
-    virtual void setMissing(size_t idx) {
-        size_t idx_in_chunk = idx % chunk_size_;
-        size_t chunk = (idx - idx_in_chunk) / chunk_size_;
-        while(chunks_ < chunk) { push_back_missing(); }
-        data_[chunk]->setMissing(idx_in_chunk);
-    }
-
-    virtual bool isMissing(size_t idx) {
-        size_t idx_in_chunk = idx % chunk_size_;
-        size_t chunk = (idx - idx_in_chunk) / chunk_size_;
-        assert(chunk < chunks_);
-        return data_[chunk]->isMissing(idx_in_chunk);
-    }
-
     virtual void set(size_t idx, String* v) {
         size_t idx_in_chunk = idx % chunk_size_;
         size_t chunk = (idx - idx_in_chunk) / chunk_size_;
-        while(chunks_ < chunk) { push_back_missing(); }
+        assert(chunk < chunks_);
         data_[chunk]->set(idx_in_chunk, v);
     }
 
@@ -551,10 +433,7 @@ public:
         if(other->count() != count()) return false;
         for (size_t i = 0; i < count(); i++)
         {
-            if(isMissing(i) != other->isMissing(i)) return false;
-            if(!isMissing(i)) {
-                if(!get(i)->equals(other->get(i))) return false;
-            }
+            if(!get(i)->equals(other->get(i))) return false;
         }
         return true;
     }
